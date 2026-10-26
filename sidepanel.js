@@ -1,10 +1,23 @@
 import { DEFAULT_CONFIG, getConfig, isConfigured, saveConfig } from "./src/config.js";
+import {
+  ensureMigrated,
+  forgetSecrets,
+  getSecretStatus,
+  getSecrets,
+  lock,
+  mergeSecrets,
+  saveSecrets,
+  setupVault,
+  switchToSession,
+  unlock
+} from "./src/secrets.js";
 import { formatHours, rangeHours, todayISO } from "./src/time.js";
 
 const $ = (id) => document.getElementById(id);
 
 const state = {
   config: null,
+  secretStatus: null,
   evidence: null,
   existing: [],
   projects: [],
@@ -39,8 +52,19 @@ function currentRange() {
   }
 }
 
+function secretsUsable() {
+  const status = state.secretStatus;
+  if (!status?.hasSecrets) {
+    return false;
+  }
+  return status.mode !== "vault" || status.unlocked;
+}
+
 function updateSetupNotice() {
-  $("setupNotice").classList.toggle("hidden", isConfigured(state.config || {}));
+  $("setupNotice").classList.toggle(
+    "hidden",
+    Boolean(state.config && isConfigured(state.config) && secretsUsable())
+  );
 }
 
 function renderProjectOptions(projects, selectedId, message = "Selecciona proyecto") {
@@ -173,8 +197,13 @@ async function loadWorkPackages(projectId, selectedWpId = "") {
 }
 
 async function loadProjects() {
-  if (!state.config?.openprojectToken) {
-    renderProjectOptions([], "", "Configura el token de OpenProject");
+  if (!secretsUsable()) {
+    const message =
+      state.secretStatus?.mode === "vault" && !state.secretStatus?.unlocked
+        ? "Desbloquea la caja de tokens"
+        : "Configura los tokens de OpenProject";
+    renderProjectOptions([], "", message);
+    renderWorkPackageOptions([], "", "Selecciona un proyecto");
     return;
   }
 
@@ -202,7 +231,8 @@ function refreshPostButton() {
     state.posted ||
     !hasSummary ||
     state.existing.length > 0 ||
-    !isConfigured(state.config || {});
+    !isConfigured(state.config || {}) ||
+    !secretsUsable();
 }
 
 function resetResult() {
@@ -222,10 +252,6 @@ function resetResult() {
 function populateSettings(config) {
   $("gitlabBaseUrl").value = config.gitlabBaseUrl;
   $("gitlabProject").value = config.gitlabProject;
-  $("gitlabToken").value = "";
-  $("gitlabToken").placeholder = config.gitlabToken
-    ? "Guardado (deja vacío para conservar)"
-    : "glpat-...";
   $("gitlabAuthor").value = config.gitlabAuthor;
 
   $("openprojectBaseUrl").value = config.openprojectBaseUrl;
@@ -233,40 +259,89 @@ function populateSettings(config) {
   $("openprojectWorkPackageId").value = config.openprojectWorkPackageId;
   $("openprojectActivityName").value = config.openprojectActivityName || "Development";
   $("openprojectActivityId").value = config.openprojectActivityId;
-  $("openprojectToken").value = "";
-  $("openprojectToken").placeholder = config.openprojectToken
-    ? "Guardado (deja vacío para conservar)"
-    : "opapi-...";
   $("sendStartTime").checked = Boolean(config.sendStartTime);
-  $("startTimeMode").value = config.startTimeMode || "literal";
+  $("startTimeMode").value = config.startTimeMode || "browser";
 
   $("llmBaseUrl").value = config.llmBaseUrl;
   $("llmModel").value = config.llmModel;
+  $("gitlabToken").value = "";
+  $("openprojectToken").value = "";
   $("llmApiKey").value = "";
-  $("llmApiKey").placeholder = config.llmApiKey
-    ? "Guardada (deja vacío para conservar)"
-    : "API key";
+}
+
+function applySecretStatus(status) {
+  state.secretStatus = status;
+  const locked = status.mode === "vault" && !status.unlocked;
+
+  const placeholder = locked
+    ? "Bloqueado"
+    : status.hasSecrets
+      ? "Guardado (deja vacío para conservar)"
+      : "Pega el token";
+
+  for (const id of ["gitlabToken", "openprojectToken", "llmApiKey"]) {
+    $(id).placeholder = placeholder;
+    $(id).disabled = locked;
+    if (locked) {
+      $(id).value = "";
+    }
+  }
+
+  if (status.mode === "vault") {
+    $("secretStatusText").textContent = status.unlocked
+      ? "Caja cifrada desbloqueada. Se bloquea a los 15 minutos."
+      : status.vaultExists
+        ? "Caja cifrada bloqueada. Introduce la contraseña."
+        : "No hay caja cifrada.";
+  } else {
+    $("secretStatusText").textContent = status.hasSecrets
+      ? "Solo esta sesión. Los tokens desaparecen al cerrar el navegador."
+      : "Sin tokens guardados. Se piden al configurar.";
+  }
+
+  $("vaultLocked").classList.toggle(
+    "hidden",
+    !(status.mode === "vault" && status.vaultExists && !status.unlocked)
+  );
+  $("vaultSetup").classList.toggle("hidden", status.mode === "vault");
+  $("vaultUnlocked").classList.toggle(
+    "hidden",
+    !(status.mode === "vault" && status.unlocked)
+  );
+
+  updateSetupNotice();
+  refreshPostButton();
+}
+
+function readEnteredSecrets() {
+  const entered = {};
+  if ($("gitlabToken").value.trim()) {
+    entered.gitlabToken = $("gitlabToken").value.trim();
+  }
+  if ($("openprojectToken").value.trim()) {
+    entered.openprojectToken = $("openprojectToken").value.trim();
+  }
+  if ($("llmApiKey").value.trim()) {
+    entered.llmApiKey = $("llmApiKey").value.trim();
+  }
+  return entered;
 }
 
 function readSettings() {
   const current = state.config || DEFAULT_CONFIG;
-  const secret = (inputId, oldValue) => $(inputId).value.trim() || oldValue;
   return {
     gitlabBaseUrl: $("gitlabBaseUrl").value.trim(),
     gitlabProject: $("gitlabProject").value.trim(),
-    gitlabToken: secret("gitlabToken", current.gitlabToken),
     gitlabAuthor: $("gitlabAuthor").value.trim(),
     openprojectBaseUrl: $("openprojectBaseUrl").value.trim(),
     openprojectProjectId: $("openprojectProjectId").value.trim(),
     openprojectWorkPackageId: $("openprojectWorkPackageId").value.trim(),
     openprojectActivityName: $("openprojectActivityName").value.trim() || "Development",
     openprojectActivityId: $("openprojectActivityId").value.trim(),
-    openprojectToken: secret("openprojectToken", current.openprojectToken),
     sendStartTime: $("sendStartTime").checked,
-    startTimeMode: $("startTimeMode").value || "literal",
+    startTimeMode: $("startTimeMode").value || "browser",
     llmBaseUrl: $("llmBaseUrl").value.trim(),
     llmModel: $("llmModel").value.trim(),
-    llmApiKey: secret("llmApiKey", current.llmApiKey),
     defaultStart: $("start").value || current.defaultStart,
     defaultEnd: $("end").value || current.defaultEnd
   };
@@ -315,6 +390,17 @@ async function saveSettings({ silent = false } = {}) {
   }
 
   state.config = await saveConfig(settings);
+
+  const entered = readEnteredSecrets();
+  if (Object.keys(entered).length) {
+    await saveSecrets(entered);
+    $("gitlabToken").value = "";
+    $("openprojectToken").value = "";
+    $("llmApiKey").value = "";
+  }
+
+  state.secretStatus = await getSecretStatus();
+  applySecretStatus(state.secretStatus);
   syncSelectionFields();
   if (!silent) {
     setSettingsStatus("Ajustes guardados.");
@@ -384,6 +470,11 @@ async function generate() {
   if (state.busy) {
     return;
   }
+  if (!secretsUsable()) {
+    setStatus("Desbloquea la caja de tokens o configura los tokens en ajustes.", "error");
+    $("settingsPanel").classList.remove("hidden");
+    return;
+  }
   if (!isConfigured(state.config || {})) {
     setStatus("Completa y guarda los ajustes antes de continuar.", "error");
     $("settingsPanel").classList.remove("hidden");
@@ -443,6 +534,11 @@ async function generate() {
 
 async function post() {
   if (state.busy) {
+    return;
+  }
+  if (!secretsUsable()) {
+    setStatus("Desbloquea la caja de tokens o configura los tokens en ajustes.", "error");
+    $("settingsPanel").classList.remove("hidden");
     return;
   }
   const date = $("date").value;
@@ -551,10 +647,95 @@ async function detectActivity() {
   }
 }
 
+async function refreshSecretStatus() {
+  state.secretStatus = await getSecretStatus();
+  applySecretStatus(state.secretStatus);
+  return state.secretStatus;
+}
+
+async function createVaultFromSettings() {
+  const password = $("newVaultPassword").value;
+  const confirmation = $("newVaultPassword2").value;
+  if (password.length < 8) {
+    throw new Error("La contraseña debe tener al menos 8 caracteres");
+  }
+  if (password !== confirmation) {
+    throw new Error("Las contraseñas no coinciden");
+  }
+
+  let current = {};
+  try {
+    current = await getSecrets();
+  } catch {
+    current = {};
+  }
+  const secrets = mergeSecrets(current, readEnteredSecrets());
+  if (!Object.values(secrets).some(Boolean)) {
+    throw new Error("Introduce al menos un token antes de crear la caja");
+  }
+
+  await setupVault(password, secrets);
+  state.config = await getConfig();
+  $("newVaultPassword").value = "";
+  $("newVaultPassword2").value = "";
+  $("gitlabToken").value = "";
+  $("openprojectToken").value = "";
+  $("llmApiKey").value = "";
+  await refreshSecretStatus();
+  setSettingsStatus("Caja cifrada creada y desbloqueada.", "ok");
+  await loadProjects();
+}
+
+async function unlockVaultFromSettings() {
+  const password = $("vaultPassword").value;
+  if (!password) {
+    throw new Error("Introduce la contraseña");
+  }
+  await unlock(password);
+  $("vaultPassword").value = "";
+  await refreshSecretStatus();
+  setSettingsStatus("Caja desbloqueada.", "ok");
+  await loadProjects();
+}
+
+async function lockVaultFromSettings() {
+  await lock();
+  await refreshSecretStatus();
+  renderProjectOptions([], "", "Caja bloqueada");
+  renderWorkPackageOptions([], "", "Selecciona un proyecto");
+  setSettingsStatus("Caja bloqueada.", "ok");
+}
+
+async function useSessionFromSettings() {
+  await switchToSession();
+  state.config = await getConfig();
+  await refreshSecretStatus();
+  setSettingsStatus("Los tokens se guardarán solo en esta sesión.", "ok");
+  await loadProjects();
+}
+
+async function forgetAllSecrets() {
+  if (!window.confirm("¿Olvidar todos los tokens guardados? Tendrás que volver a introducirlos.")) {
+    return;
+  }
+  await forgetSecrets();
+  state.config = await getConfig();
+  $("gitlabToken").value = "";
+  $("openprojectToken").value = "";
+  $("llmApiKey").value = "";
+  await refreshSecretStatus();
+  resetResult();
+  renderProjectOptions([], "", "Configura los tokens");
+  renderWorkPackageOptions([], "", "Selecciona un proyecto");
+  setSettingsStatus("Tokens olvidados.", "ok");
+}
+
 async function init() {
   $("version").textContent = `v${chrome.runtime.getManifest().version}`;
+  await ensureMigrated();
   state.config = await getConfig();
   populateSettings(state.config);
+  await refreshSecretStatus();
 
   $("date").value = todayISO();
   $("start").value = state.config.defaultStart || "08:00";
@@ -562,7 +743,12 @@ async function init() {
   syncSelectionFields();
   currentRange();
   refreshPostButton();
-  await loadProjects();
+  if (secretsUsable()) {
+    await loadProjects();
+  } else {
+    renderProjectOptions([], "", "Desbloquea o configura los tokens");
+    renderWorkPackageOptions([], "", "Selecciona un proyecto");
+  }
 
   $("settingsToggle").addEventListener("click", () => {
     const panel = $("settingsPanel");
@@ -576,6 +762,46 @@ async function init() {
       await saveSettings();
       populateSettings(state.config);
       await loadProjects();
+    } catch (error) {
+      setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("createVaultBtn").addEventListener("click", async () => {
+    try {
+      await createVaultFromSettings();
+    } catch (error) {
+      setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("unlockVaultBtn").addEventListener("click", async () => {
+    try {
+      await unlockVaultFromSettings();
+    } catch (error) {
+      setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("lockVaultBtn").addEventListener("click", async () => {
+    try {
+      await lockVaultFromSettings();
+    } catch (error) {
+      setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("useSessionBtn").addEventListener("click", async () => {
+    try {
+      await useSessionFromSettings();
+    } catch (error) {
+      setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("forgetSecretsBtn").addEventListener("click", async () => {
+    try {
+      await forgetAllSecrets();
     } catch (error) {
       setSettingsStatus(error.message, "error");
     }
@@ -625,6 +851,17 @@ async function init() {
     resetResult();
     setStatus("");
   });
+
+  setInterval(async () => {
+    if (!state.config) {
+      return;
+    }
+    const wasUnlocked = state.secretStatus?.unlocked;
+    await refreshSecretStatus();
+    if (wasUnlocked && state.secretStatus?.mode === "vault" && !state.secretStatus.unlocked) {
+      setStatus("Caja de tokens bloqueada por inactividad.", "error");
+    }
+  }, 60000);
 }
 
 init().catch((error) => {

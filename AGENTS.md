@@ -58,6 +58,8 @@ background.js
         +-- src/time.js
         +-- src/http.js
         +-- src/config.js
+        +-- src/secrets.js
+        +-- src/vault.js
 ```
 
 - `sidepanel.js` solo pinta UI y envía mensajes.
@@ -81,7 +83,7 @@ background.js
   `POST {llmBaseUrl}/chat/completions`.
 - Configuración: `llmBaseUrl`, `llmModel`, `llmApiKey`.
 - Si falta configuración o falla, se usa `fallbackSummary()` de `src/summary.js`.
-- No reintroducir nombres de proveedores concretos en la UI, configuración o README.
+- El cliente debe seguir siendo genérico. Los valores por defecto pueden apuntar a un proveedor concreto, pero el usuario debe poder cambiarlos.
 - No enviar tokens de GitLab/OpenProject al LLM.
 
 ### OpenProject
@@ -127,13 +129,17 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
 
 ## Seguridad
 
-- Los tokens viven en `chrome.storage.local`, nunca en `src/config.js`.
+- Los tokens nunca viven en `src/config.js` ni en el repo.
+- Modo por defecto: `chrome.storage.session`, sin persistencia en disco.
+- Modo opcional: caja cifrada en `chrome.storage.local` con AES-GCM/PBKDF2; clave derivada solo en `chrome.storage.session`.
+- No crear cifrado falso guardando la clave junto al texto cifrado.
 - No commitear `.env`, tokens, API keys ni datos reales.
 - `manifest.json` no declara hosts de GitLab/OpenProject; se solicitan en runtime.
 - `optional_host_permissions` es amplio (`https://*/*`); cualquier endurecimiento debe probar el flujo de `ensureOriginPermission`.
 - `ensureOriginPermission()` debe llamarse dentro del gesto de usuario al guardar ajustes.
 - Revisar `SECURITY.md` antes de cambiar permisos, almacenamiento o flujos al LLM.
 - No enviar datos de GitLab al LLM sin que el usuario haya configurado explícitamente un endpoint.
+- La caja se bloquea a los 15 minutos; no eliminar esa comprobación sin revisar la UX.
 
 ## Tests
 
@@ -148,7 +154,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **15/15 tests pasan**.
+Estado verificado: **20/20 tests pasan**.
 
 ## Estado actual y deuda técnica
 
@@ -168,7 +174,7 @@ Estado verificado: **15/15 tests pasan**.
 2. `node --check` pasa en archivos tocados.
 3. No hay tokens ni URLs internas.
 4. No se rompió el payload de OpenProject (`user` ausente).
-5. No se reintrodujeron proveedores LLM concretos.
+5. El cliente LLM sigue aceptando URL/modelo configurables.
 6. README/SECURITY actualizados si cambia el comportamiento.
 7. Permisos de `manifest.json` siguen siendo mínimos.
 8. No commitear ni pushear salvo petición explícita.

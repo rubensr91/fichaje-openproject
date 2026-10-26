@@ -273,7 +273,7 @@ export async function createTimeEntry(config, { date, start, end, comment, activ
   };
 
   if (config.sendStartTime) {
-    const mode = config.startTimeMode || "literal";
+    const mode = config.startTimeMode || "browser";
     if (mode === "openproject") {
       // Convierte la hora local a la zona del perfil de OpenProject.
       const timeZone = await getOpenProjectTimeZone(config);

@@ -95,11 +95,31 @@ Los permisos de host se solicitan al guardar la configuración. La extensión no
 
 ## Almacenamiento de secretos
 
-- Los tokens y la API key se guardan en `chrome.storage.local`.
+Hay dos modos:
+
+### Solo sesión
+
+- Tokens y API key en `chrome.storage.session`.
+- No se escriben en disco.
+- Desaparecen al cerrar el navegador.
+- Es el modo por defecto.
+
+### Caja cifrada
+
+- Tokens cifrados en `chrome.storage.local`.
+- AES-GCM 256.
+- Clave derivada de la contraseña con PBKDF2-SHA256 y 600.000 iteraciones.
+- Salt e IV aleatorios.
+- La clave derivada se guarda solo en `chrome.storage.session`.
+- Auto-lock a los 15 minutos.
+- Si se pierde la contraseña, los tokens no se pueden recuperar.
+
+En ambos modos:
+
 - No se sincronizan entre dispositivos.
-- **No están cifrados por la extensión.** Dependen del cifrado del disco y de la seguridad del perfil del navegador.
-- Cualquier persona o malware con acceso al perfil puede leerlos.
-- No usar en equipos compartidos ni en perfiles de navegador sin protección.
+- Cualquier malware con acceso al perfil puede leer los tokens mientras estén disponibles.
+- No usar en equipos compartidos ni en perfiles sin protección.
+- El cifrado protege el archivo en reposo, no un navegador comprometido o desbloqueado.
 
 ## Riesgos conocidos
 

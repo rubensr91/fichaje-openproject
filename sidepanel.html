@@ -167,13 +167,57 @@
           <label class="field">
             <span>Modo de hora de inicio</span>
             <select id="startTimeMode">
-              <option value="literal">Literal: 08:00 → 08:00Z</option>
-              <option value="openproject">Convertir a zona OpenProject</option>
               <option value="browser">Convertir a zona del navegador</option>
+              <option value="openproject">Convertir a zona OpenProject</option>
+              <option value="literal">Literal: 08:00 → 08:00Z</option>
             </select>
           </label>
           <p class="hint">
-            Para esta instancia usa «Literal». Si OpenProject muestra otra hora, prueba los otros modos.
+            Para esta instancia usa «Zona del navegador». Si OpenProject muestra otra hora, prueba los otros modos.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Seguridad de tokens</legend>
+          <p id="secretStatusText" class="hint"></p>
+
+          <div id="vaultLocked" class="hidden">
+            <label class="field">
+              <span>Contraseña de la caja</span>
+              <input id="vaultPassword" type="password" autocomplete="current-password" />
+            </label>
+            <button id="unlockVaultBtn" class="button ghost small" type="button">
+              Desbloquear
+            </button>
+          </div>
+
+          <div id="vaultSetup" class="hidden">
+            <label class="field">
+              <span>Contraseña nueva</span>
+              <input id="newVaultPassword" type="password" autocomplete="new-password" />
+            </label>
+            <label class="field">
+              <span>Repetir contraseña</span>
+              <input id="newVaultPassword2" type="password" autocomplete="new-password" />
+            </label>
+            <button id="createVaultBtn" class="button ghost small" type="button">
+              Crear caja cifrada
+            </button>
+          </div>
+
+          <div id="vaultUnlocked" class="hidden">
+            <button id="lockVaultBtn" class="button ghost small" type="button">Bloquear</button>
+            <button id="useSessionBtn" class="button ghost small" type="button">
+              Usar solo esta sesión
+            </button>
+          </div>
+
+          <button id="forgetSecretsBtn" class="button ghost small" type="button">
+            Olvidar tokens
+          </button>
+          <p class="hint">
+            Por defecto los tokens viven solo en memoria hasta cerrar el navegador. La caja cifrada
+            los guarda en disco con AES-GCM y contraseña.
           </p>
         </fieldset>
 

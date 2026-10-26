@@ -381,7 +381,8 @@ legend {
   accent-color: var(--accent);
 }
 
-.button-row {
+.button-row,
+#vaultUnlocked {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;

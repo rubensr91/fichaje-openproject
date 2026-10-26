@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createTimeEntry } from "../src/openproject.js";
+import { localDateTimeToUTC } from "../src/time.js";
 
 test("construye el payload de OpenProject con tramo y actividad", async () => {
   const originalFetch = globalThis.fetch;
@@ -51,7 +52,7 @@ test("construye el payload de OpenProject con tramo y actividad", async () => {
     assert.equal(entry.id, 1234);
     assert.equal(createPayload.spentOn, "2026-10-26");
     assert.equal(createPayload.hours, "PT7H15M");
-    assert.equal(createPayload.startTime, "2026-10-26T08:00:00.000Z");
+    assert.equal(createPayload.startTime, localDateTimeToUTC("2026-10-26", "08:00"));
     assert.equal(createPayload.comment.raw, "Resumen del día");
     assert.equal(createPayload._links.project.href, "/api/v3/projects/101");
     assert.equal(createPayload._links.entity.href, "/api/v3/work_packages/201");

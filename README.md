@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.8`. No incluye tokens ni claves. La configuración se guarda en `chrome.storage.local`.
+MVP, versión `0.1.11`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -56,13 +56,15 @@ Al abrir la extensión se cargan los proyectos disponibles para tu usuario. Desp
 
 ### Resumen con LLM
 
-El resumen se genera con cualquier endpoint compatible con **OpenAI Chat Completions**. Cada usuario elige proveedor, modelo y API key en los ajustes de la extensión:
+El resumen se genera con cualquier endpoint compatible con **OpenAI Chat Completions**. Cada usuario puede cambiar proveedor, modelo y API key en los ajustes de la extensión.
 
-- **URL base**: la de su proveedor, terminada en `/v1` o equivalente.
-- **Modelo**: el nombre exacto del modelo.
-- **API key**: la de su cuenta.
+Valores por defecto:
 
-Si se deja sin configurar, la extensión usa el resumen local determinista y no envía datos a ningún LLM.
+- **URL base**: `https://generativelanguage.googleapis.com/v1beta/openai`
+- **Modelo**: `gemini-3.1-flash-lite`
+- **API key**: vacía; hay que introducir la de la cuenta.
+
+Si se deja sin API key, la extensión usa el resumen local determinista y no envía datos a ningún LLM.
 
 La API del LLM es stateless: no puede leer conversaciones existentes de la interfaz web del proveedor. Para imitar un estilo, hay que añadir ejemplos en el prompt. La extensión todavía no tiene campo de ejemplos.
 
@@ -94,9 +96,9 @@ La opción **Enviar hora de inicio a OpenProject** está activada por defecto. S
 
 OpenProject recibe `startTime` como instante UTC. La extensión tiene tres modos:
 
-- **Literal** (recomendado en esta instancia): `08:00` se envía como `08:00Z`, igual que las entradas creadas desde la UI.
+- **Zona navegador** (recomendado): convierte `08:00` a UTC usando la zona del navegador.
 - **Zona OpenProject**: convierte `08:00` a la zona del perfil de OpenProject.
-- **Zona navegador**: convierte `08:00` a UTC usando la zona del navegador.
+- **Literal**: `08:00` se envía como `08:00Z`.
 
 Si la hora sale desplazada, cambia de modo y prueba. La fecha del fichaje es `spentOn`.
 
@@ -120,11 +122,21 @@ Revisa la política de empresa antes de usar un LLM externo con datos de reposit
 
 Consulta [SECURITY.md](SECURITY.md) para el modelo de amenazas y cómo reportar vulnerabilidades.
 
-- Los tokens se guardan solo en `storage.local` de la extensión.
+- Por defecto, los tokens se guardan solo en `chrome.storage.session` y desaparecen al cerrar el navegador.
+- Opcionalmente, se pueden guardar en una caja cifrada con AES-GCM y contraseña.
 - No se envían a GitLab, OpenProject ni al LLM.
 - No subas tokens al repositorio.
 - Si un token se pega en un chat, considéralo comprometido y revócalo.
 - La API key del LLM se envía únicamente al endpoint configurado por el usuario.
+
+### Modos de tokens
+
+En **Ajustes → Seguridad de tokens**:
+
+- **Solo esta sesión** (por defecto): tokens en memoria; se pierden al cerrar Brave.
+- **Caja cifrada**: tokens cifrados en disco; se piden contraseña al abrir el navegador.
+- La caja se bloquea automáticamente a los 15 minutos.
+- Si olvidas la contraseña, no se pueden recuperar los tokens: usa **Olvidar tokens** y vuelve a configurarlos.
 
 ## Limitaciones actuales
 

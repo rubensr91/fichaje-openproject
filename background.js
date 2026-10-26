@@ -1,4 +1,4 @@
-import { getConfig } from "./src/config.js";
+import { getRuntimeConfig } from "./src/secrets.js";
 import { fetchDay, testGitLab } from "./src/gitlab.js";
 import {
   createTimeEntry,
@@ -36,7 +36,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 async function handle(message) {
-  const config = await getConfig();
+  const config = await getRuntimeConfig();
 
   switch (message.type) {
     case "TEST_CONNECTIONS": {
