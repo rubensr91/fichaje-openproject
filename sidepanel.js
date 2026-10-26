@@ -300,6 +300,15 @@ function applySecretStatus(status) {
       : "Sin tokens guardados. Se piden al configurar.";
   }
 
+  $("lockedBanner").classList.toggle(
+    "hidden",
+    !(status.mode === "vault" && status.vaultExists && !status.unlocked)
+  );
+  if (status.unlocked) {
+    $("quickUnlockPassword").value = "";
+    $("quickUnlockError").classList.add("hidden");
+  }
+
   $("vaultLocked").classList.toggle(
     "hidden",
     !(status.mode === "vault" && status.vaultExists && !status.unlocked)
@@ -688,16 +697,20 @@ async function createVaultFromSettings() {
   await loadProjects();
 }
 
-async function unlockVaultFromSettings() {
-  const password = $("vaultPassword").value;
+async function unlockVaultWithPassword(password) {
   if (!password) {
     throw new Error("Introduce la contraseña");
   }
   await unlock(password);
-  $("vaultPassword").value = "";
   await refreshSecretStatus();
-  setSettingsStatus("Caja desbloqueada.", "ok");
   await loadProjects();
+}
+
+async function unlockVaultFromSettings() {
+  const password = $("vaultPassword").value;
+  await unlockVaultWithPassword(password);
+  $("vaultPassword").value = "";
+  setSettingsStatus("Caja desbloqueada.", "ok");
 }
 
 async function lockVaultFromSettings() {
@@ -774,6 +787,25 @@ async function init() {
       await createVaultFromSettings();
     } catch (error) {
       setSettingsStatus(error.message, "error");
+    }
+  });
+
+  $("quickUnlockBtn").addEventListener("click", async () => {
+    try {
+      await unlockVaultWithPassword($("quickUnlockPassword").value);
+      $("quickUnlockPassword").value = "";
+      $("quickUnlockError").classList.add("hidden");
+      setStatus("Caja desbloqueada.", "success");
+    } catch (error) {
+      $("quickUnlockError").textContent = error.message;
+      $("quickUnlockError").classList.remove("hidden");
+    }
+  });
+
+  $("quickUnlockPassword").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      $("quickUnlockBtn").click();
     }
   });
 

@@ -111,6 +111,19 @@ main {
   gap: 12px;
 }
 
+.locked-banner {
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
+}
+
+.locked-banner strong {
+  font-size: 13px;
+}
+
+.locked-banner .hint {
+  margin-top: 2px;
+}
+
 .field {
   display: grid;
   gap: 4px;

@@ -25,6 +25,26 @@
     </header>
 
     <main>
+      <section id="lockedBanner" class="card locked-banner hidden">
+        <div>
+          <strong>Caja de tokens bloqueada</strong>
+          <p class="hint">Introduce la contraseña para cargar proyectos y fichar.</p>
+        </div>
+        <label class="field">
+          <span>Contraseña</span>
+          <input
+            id="quickUnlockPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Contraseña de la caja"
+          />
+        </label>
+        <button id="quickUnlockBtn" class="button primary small" type="button">
+          Desbloquear
+        </button>
+        <p id="quickUnlockError" class="field-error hidden"></p>
+      </section>
+
       <section id="setupNotice" class="notice info hidden">
         <strong>Falta configuración.</strong>
         <span>Abre los ajustes y completa GitLab y OpenProject.</span>
