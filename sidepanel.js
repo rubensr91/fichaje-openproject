@@ -240,18 +240,12 @@ function populateSettings(config) {
   $("sendStartTime").checked = Boolean(config.sendStartTime);
   $("startTimeMode").value = config.startTimeMode || "literal";
 
-  $("llmProvider").value = config.llmProvider || "gemini";
-  $("geminiBaseUrl").value = config.geminiBaseUrl;
-  $("geminiModel").value = config.geminiModel;
-  $("geminiApiKey").value = "";
-  $("geminiApiKey").placeholder = config.geminiApiKey
+  $("llmBaseUrl").value = config.llmBaseUrl;
+  $("llmModel").value = config.llmModel;
+  $("llmApiKey").value = "";
+  $("llmApiKey").placeholder = config.llmApiKey
     ? "Guardada (deja vacío para conservar)"
-    : "AIza...";
-
-  $("qwenBaseUrl").value = config.qwenBaseUrl;
-  $("qwenModel").value = config.qwenModel;
-  $("qwenApiKey").value = "";
-  $("qwenApiKey").placeholder = config.qwenApiKey ? "Guardada (deja vacío para conservar)" : "sk-...";
+    : "API key";
 }
 
 function readSettings() {
@@ -270,25 +264,24 @@ function readSettings() {
     openprojectToken: secret("openprojectToken", current.openprojectToken),
     sendStartTime: $("sendStartTime").checked,
     startTimeMode: $("startTimeMode").value || "literal",
-    llmProvider: $("llmProvider").value || "gemini",
-    geminiBaseUrl: $("geminiBaseUrl").value.trim(),
-    geminiModel: $("geminiModel").value.trim() || "gemini-3.1-flash",
-    geminiApiKey: secret("geminiApiKey", current.geminiApiKey),
-    qwenBaseUrl: $("qwenBaseUrl").value.trim(),
-    qwenModel: $("qwenModel").value.trim() || "qwen3.6-flash",
-    qwenApiKey: secret("qwenApiKey", current.qwenApiKey),
+    llmBaseUrl: $("llmBaseUrl").value.trim(),
+    llmModel: $("llmModel").value.trim(),
+    llmApiKey: secret("llmApiKey", current.llmApiKey),
     defaultStart: $("start").value || current.defaultStart,
     defaultEnd: $("end").value || current.defaultEnd
   };
 }
 
 function validateUrls(settings) {
-  for (const [label, value] of [
+  const urls = [
     ["GitLab", settings.gitlabBaseUrl],
-    ["OpenProject", settings.openprojectBaseUrl],
-    ["Gemini", settings.geminiBaseUrl],
-    ["Qwen", settings.qwenBaseUrl]
-  ]) {
+    ["OpenProject", settings.openprojectBaseUrl]
+  ];
+  if (settings.llmBaseUrl) {
+    urls.push(["LLM", settings.llmBaseUrl]);
+  }
+
+  for (const [label, value] of urls) {
     let parsed;
     try {
       parsed = new URL(value);
@@ -311,12 +304,12 @@ async function saveSettings({ silent = false } = {}) {
   const settings = readSettings();
   validateUrls(settings);
 
-  const permissions = await Promise.all([
-    ensureOriginPermission(settings.gitlabBaseUrl),
-    ensureOriginPermission(settings.openprojectBaseUrl),
-    ensureOriginPermission(settings.geminiBaseUrl),
-    ensureOriginPermission(settings.qwenBaseUrl)
-  ]);
+  const origins = [
+    settings.gitlabBaseUrl,
+    settings.openprojectBaseUrl,
+    settings.llmBaseUrl
+  ].filter(Boolean);
+  const permissions = await Promise.all(origins.map(ensureOriginPermission));
   if (permissions.some((granted) => !granted)) {
     throw new Error("No se concedió permiso para acceder a alguna de las URLs");
   }
@@ -369,8 +362,7 @@ function renderExisting(entries) {
 function renderSummary(result, day) {
   $("summary").value = result.text;
   $("summarySection").classList.remove("hidden");
-  $("summarySource").textContent =
-    result.source === "gemini" ? "Gemini" : result.source === "qwen" ? "Qwen" : "Local";
+  $("summarySource").textContent = result.source === "llm" ? "LLM" : "Local";
   $("summarySource").classList.remove("hidden");
 
   const counts = day.counts || {};
@@ -529,11 +521,7 @@ async function testConnections() {
     if (result.openproject.activityWarning) {
       parts.push(`Actividad: ${result.openproject.activityWarning}`);
     }
-    parts.push(
-      `${result.llm.provider === "gemini" ? "Gemini" : "Qwen"}: ${
-        result.llm.configured ? "API key configurada" : "sin API key"
-      }`
-    );
+    parts.push(`LLM: ${result.llm.configured ? "configurado" : "sin configurar"}`);
     setSettingsStatus(parts.join(" · "), result.gitlab.ok && result.openproject.ok ? "ok" : "error");
   } catch (error) {
     setSettingsStatus(error.message, "error");
@@ -563,17 +551,10 @@ async function detectActivity() {
   }
 }
 
-function updateProviderVisibility() {
-  const provider = $("llmProvider").value || "gemini";
-  $("geminiSettings").classList.toggle("hidden", provider !== "gemini");
-  $("qwenSettings").classList.toggle("hidden", provider !== "qwen");
-}
-
 async function init() {
   $("version").textContent = `v${chrome.runtime.getManifest().version}`;
   state.config = await getConfig();
   populateSettings(state.config);
-  updateProviderVisibility();
 
   $("date").value = todayISO();
   $("start").value = state.config.defaultStart || "08:00";
@@ -625,7 +606,6 @@ async function init() {
     setStatus("");
   });
 
-  $("llmProvider").addEventListener("change", updateProviderVisibility);
   $("testBtn").addEventListener("click", testConnections);
   $("detectActivityBtn").addEventListener("click", detectActivity);
   $("generateBtn").addEventListener("click", generate);

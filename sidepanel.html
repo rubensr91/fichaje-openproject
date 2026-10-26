@@ -178,59 +178,26 @@
         </fieldset>
 
         <fieldset>
-          <legend>Modelo de resumen</legend>
-          <label class="field">
-            <span>Proveedor</span>
-            <select id="llmProvider">
-              <option value="gemini">Gemini</option>
-              <option value="qwen">Qwen</option>
-            </select>
-          </label>
-        </fieldset>
-
-        <fieldset id="geminiSettings">
-          <legend>Gemini</legend>
-          <label class="field">
-            <span>URL base</span>
-            <input
-              id="geminiBaseUrl"
-              type="url"
-              placeholder="https://generativelanguage.googleapis.com/v1beta"
-            />
-          </label>
-          <label class="field">
-            <span>Modelo</span>
-            <input id="geminiModel" type="text" placeholder="gemini-3.1-flash" />
-          </label>
-          <label class="field">
-            <span>API key</span>
-            <input id="geminiApiKey" type="password" autocomplete="off" placeholder="AIza..." />
-          </label>
-          <p class="hint">
-            La key se guarda en <code>storage.local</code>. Se envía solo a Google Gemini.
-          </p>
-        </fieldset>
-
-        <fieldset id="qwenSettings">
-          <legend>Qwen</legend>
+          <legend>Resumen con LLM</legend>
           <label class="field">
             <span>URL base compatible OpenAI</span>
             <input
-              id="qwenBaseUrl"
+              id="llmBaseUrl"
               type="url"
-              placeholder="https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+              placeholder="https://tu-proveedor.example/v1"
             />
           </label>
           <label class="field">
             <span>Modelo</span>
-            <input id="qwenModel" type="text" placeholder="qwen3.6-flash" />
+            <input id="llmModel" type="text" placeholder="nombre-del-modelo" />
           </label>
           <label class="field">
             <span>API key</span>
-            <input id="qwenApiKey" type="password" autocomplete="off" placeholder="sk-..." />
+            <input id="llmApiKey" type="password" autocomplete="off" placeholder="..." />
           </label>
           <p class="hint">
-            La key se guarda en <code>storage.local</code>. No se envía a GitLab ni a OpenProject.
+            Cualquier endpoint compatible con OpenAI Chat Completions. Si se deja vacío, se usa el
+            resumen local. La key se guarda en <code>storage.local</code>.
           </p>
         </fieldset>
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildQwenMessages,
+  buildLlmMessages,
   fallbackSummary,
   normalizeEvidence
 } from "../src/summary.js";
@@ -36,8 +36,8 @@ test("normaliza y recorta campos", () => {
   assert.ok(normalized.commits[0].message.length <= 400);
 });
 
-test("construye mensajes para Qwen con fecha y proyecto", () => {
-  const messages = buildQwenMessages(evidence, "2026-10-26", "demo/project");
+test("construye mensajes para el LLM con fecha y proyecto", () => {
+  const messages = buildLlmMessages(evidence, "2026-10-26", "demo/project");
   assert.equal(messages[0].role, "system");
   assert.match(messages[0].content, /No inventes/);
   assert.equal(messages[1].role, "user");

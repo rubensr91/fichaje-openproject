@@ -100,7 +100,7 @@ export function buildEvidenceText(evidence, date, projectName) {
   return truncate(lines.join("\n"), 9000);
 }
 
-export function buildQwenMessages(evidence, date, projectName) {
+export function buildLlmMessages(evidence, date, projectName) {
   return [
     {
       role: "system",

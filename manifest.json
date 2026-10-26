@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fichaje GitLab → OpenProject",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Resume el trabajo del día en GitLab y crea fichajes en OpenProject.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -10,10 +10,6 @@
     "128": "icons/icon-128.png"
   },
   "permissions": ["storage", "sidePanel"],
-  "host_permissions": [
-    "https://generativelanguage.googleapis.com/*",
-    "https://*.aliyuncs.com/*"
-  ],
   "optional_host_permissions": ["https://*/*"],
   "background": {
     "service_worker": "background.js",

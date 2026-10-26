@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { summarize } from "../src/gemini.js";
+import { summarize } from "../src/llm.js";
 
 const evidence = {
   commits: [{ title: "feat: cabecera de cliente", message: "feat: cabecera de cliente" }],
@@ -8,7 +8,7 @@ const evidence = {
   issues: []
 };
 
-test("llama a Gemini 3.1 Flash y devuelve el texto", async () => {
+test("llama a un endpoint compatible OpenAI y devuelve el texto", async () => {
   const originalFetch = globalThis.fetch;
   let request = null;
 
@@ -20,7 +20,7 @@ test("llama a Gemini 3.1 Flash y devuelve el texto", async () => {
     };
     return new Response(
       JSON.stringify({
-        candidates: [{ content: { parts: [{ text: "Resumen Gemini del día." }] } }]
+        choices: [{ message: { content: "Resumen del día." } }]
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
@@ -29,31 +29,32 @@ test("llama a Gemini 3.1 Flash y devuelve el texto", async () => {
   try {
     const result = await summarize(
       {
-        geminiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-        geminiModel: "gemini-3.1-flash",
-        geminiApiKey: "test-key"
+        llmBaseUrl: "https://llm.example.test/v1",
+        llmModel: "modelo-de-prueba",
+        llmApiKey: "test-key"
       },
       { date: "2026-10-26", projectName: "demo/project", evidence }
     );
 
-    assert.equal(result.source, "gemini");
-    assert.equal(result.text, "Resumen Gemini del día.");
-    assert.match(request.url, /\/models\/gemini-3\.1-flash:generateContent$/);
-    assert.equal(request.headers["x-goog-api-key"], "test-key");
-    assert.match(request.body.systemInstruction.parts[0].text, /No inventes/);
-    assert.match(request.body.contents[0].parts[0].text, /2026-10-26/);
-    assert.equal(request.body.generationConfig.temperature, 0.2);
+    assert.equal(result.source, "llm");
+    assert.equal(result.text, "Resumen del día.");
+    assert.match(request.url, /\/chat\/completions$/);
+    assert.equal(request.headers.Authorization, "Bearer test-key");
+    assert.equal(request.body.model, "modelo-de-prueba");
+    assert.match(request.body.messages[0].content, /No inventes/);
+    assert.match(request.body.messages[1].content, /2026-10-26/);
+    assert.equal(request.body.temperature, 0.2);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("usa el resumen local si falta la API key de Gemini", async () => {
+test("usa el resumen local si no hay LLM configurado", async () => {
   const result = await summarize(
-    { geminiBaseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+    { llmBaseUrl: "", llmModel: "", llmApiKey: "" },
     { date: "2026-10-26", projectName: "demo/project", evidence }
   );
   assert.equal(result.source, "local");
   assert.match(result.text, /cabecera de cliente/);
-  assert.match(result.warning, /Sin API key/);
+  assert.match(result.warning, /Sin LLM configurado/);
 });

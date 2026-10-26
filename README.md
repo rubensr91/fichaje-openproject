@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.7`. No incluye tokens ni claves. La configuración se guarda en `chrome.storage.local`.
+MVP, versión `0.1.8`. No incluye tokens ni claves. La configuración se guarda en `chrome.storage.local`.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -54,28 +54,17 @@ OpenProject exige un work package. No se puede fichar solo contra el proyecto.
 
 Al abrir la extensión se cargan los proyectos disponibles para tu usuario. Después eliges el work package con el buscador.
 
-### Resumen: Gemini / Qwen
+### Resumen con LLM
 
-Proveedor por defecto: **Gemini**.
+El resumen se genera con cualquier endpoint compatible con **OpenAI Chat Completions**. Cada usuario elige proveedor, modelo y API key en los ajustes de la extensión:
 
-#### Gemini
+- **URL base**: la de su proveedor, terminada en `/v1` o equivalente.
+- **Modelo**: el nombre exacto del modelo.
+- **API key**: la de su cuenta.
 
-- URL base: `https://generativelanguage.googleapis.com/v1beta`
-- Modelo: `gemini-3.1-flash`
-- API key de Google AI Studio / Gemini API.
+Si se deja sin configurar, la extensión usa el resumen local determinista y no envía datos a ningún LLM.
 
-La API de Gemini es stateless: no puede leer la conversación de la app de Gemini. Para imitar estilo, hay que enviar ejemplos en el prompt. La extensión todavía no tiene campo de ejemplos.
-
-#### Qwen
-
-Alternativa configurable:
-
-- URL base Token Plan (Singapur):
-  `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
-- Modelo: `qwen3.6-flash`
-- API key de Alibaba Model Studio Token Plan (`sk-sp-...`).
-
-Token Plan está pensado para herramientas interactivas. Si la empresa lo considera backend, habría que usar una API key pay-as-you-go y el endpoint DashScope correspondiente.
+La API del LLM es stateless: no puede leer conversaciones existentes de la interfaz web del proveedor. Para imitar un estilo, hay que añadir ejemplos en el prompt. La extensión todavía no tiene campo de ejemplos.
 
 ### Jornada
 
@@ -122,19 +111,20 @@ Si la hora sale desplazada, cambia de modo y prueba. La fecha del fichaje es `sp
 ## Privacidad
 
 - GitLab: se envían títulos y mensajes de commits, MRs e issues.
-- Gemini: el resumen se genera enviando esos datos a Google.
-- Qwen: alternativa que envía esos datos a Alibaba.
+- LLM: si se configura, el resumen se genera enviando esos datos al proveedor elegido.
 - OpenProject: solo se envía el resumen y las horas.
 
 Revisa la política de empresa antes de usar un LLM externo con datos de repositorios privados.
 
 ## Seguridad
 
+Consulta [SECURITY.md](SECURITY.md) para el modelo de amenazas y cómo reportar vulnerabilidades.
+
 - Los tokens se guardan solo en `storage.local` de la extensión.
 - No se envían a GitLab, OpenProject ni al LLM.
 - No subas tokens al repositorio.
 - Si un token se pega en un chat, considéralo comprometido y revócalo.
-- La API key de Gemini se envía únicamente a Google; la de Qwen, únicamente a Alibaba.
+- La API key del LLM se envía únicamente al endpoint configurado por el usuario.
 
 ## Limitaciones actuales
 
@@ -156,14 +146,14 @@ npm test
 ## Estructura
 
 - `manifest.json`: permisos, panel lateral, service worker e iconos.
+- `AGENTS.md`: guía para agentes y colaboradores técnicos.
+- `SECURITY.md`: modelo de amenazas y reporte de vulnerabilidades.
 - `icons/`: iconos de la extensión.
 - `background.js`: router de mensajes y llamadas a APIs.
 - `sidepanel.html/css/js`: interfaz.
 - `src/gitlab.js`: commits, MRs e issues.
 - `src/openproject.js`: usuario, proyecto, WP, actividades, duplicados y creación.
-- `src/llm.js`: selector Gemini/Qwen.
-- `src/gemini.js`: resumen con Gemini.
-- `src/qwen.js`: resumen con Qwen.
+- `src/llm.js`: cliente LLM compatible con OpenAI Chat Completions.
 - `src/summary.js`: resumen local y prompt.
 - `src/time.js`: tramos, duraciones y fechas.
 - `src/http.js`: fetch con timeout y errores.

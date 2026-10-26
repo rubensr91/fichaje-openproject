@@ -54,11 +54,9 @@ async function handle(message) {
             ? { ok: true, ...openproject.value }
             : { ok: false, error: openproject.reason?.message || String(openproject.reason) },
         llm: {
-          provider: config.llmProvider || "gemini",
-          configured:
-            (config.llmProvider || "gemini") === "gemini"
-              ? Boolean(config.geminiApiKey && config.geminiBaseUrl)
-              : Boolean(config.qwenApiKey && config.qwenBaseUrl)
+          configured: Boolean(
+            config.llmApiKey && config.llmBaseUrl && config.llmModel
+          )
         }
       };
     }

@@ -13,13 +13,9 @@ export const DEFAULT_CONFIG = {
   openprojectToken: "",
   sendStartTime: true,
   startTimeMode: "literal",
-  llmProvider: "gemini",
-  geminiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-  geminiModel: "gemini-3.1-flash",
-  geminiApiKey: "",
-  qwenBaseUrl: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
-  qwenModel: "qwen3.6-flash",
-  qwenApiKey: "",
+  llmBaseUrl: "",
+  llmModel: "",
+  llmApiKey: "",
   defaultStart: "08:00",
   defaultEnd: "15:15"
 };
