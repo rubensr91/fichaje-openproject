@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.11`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.12`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -67,6 +67,27 @@ Valores por defecto:
 Si se deja sin API key, la extensión usa el resumen local determinista y no envía datos a ningún LLM.
 
 La API del LLM es stateless: no puede leer conversaciones existentes de la interfaz web del proveedor. Para imitar un estilo, hay que añadir ejemplos en el prompt. La extensión todavía no tiene campo de ejemplos.
+
+### Filtro antes del LLM
+
+Antes de enviar actividad al LLM, la extensión pasa el texto por un filtro de secretos:
+
+- tokens de GitLab/OpenProject;
+- claves de Google, OpenAI y otros proveedores;
+- tokens de GitHub;
+- claves AWS;
+- JWT;
+- claves privadas;
+- cabeceras `Authorization`/`Bearer`;
+- URLs con usuario y contraseña;
+- asignaciones tipo `password=`, `token=`, `secret=`, etc.
+
+Modos:
+
+- **Redactar y avisar**: sustituye lo detectado por `[REDACTED:...]` y muestra un aviso.
+- **Bloquear envío**: si detecta algo, no llama al LLM y usa el resumen local.
+
+El filtro reduce el riesgo, pero **no garantiza** detectar cualquier secreto. Un secreto con formato desconocido puede pasar. Para repositorios sensibles, usa el resumen local o un LLM aprobado.
 
 ### Jornada
 

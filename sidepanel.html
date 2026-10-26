@@ -239,9 +239,17 @@
             <span>API key</span>
             <input id="llmApiKey" type="password" autocomplete="off" placeholder="..." />
           </label>
+          <label class="field">
+            <span>Filtro de secretos</span>
+            <select id="llmFilterMode">
+              <option value="redact">Redactar y avisar</option>
+              <option value="block">Bloquear envío y usar resumen local</option>
+            </select>
+          </label>
           <p class="hint">
             Cualquier endpoint compatible con OpenAI Chat Completions. Si se deja vacío, se usa el
-            resumen local. La key se guarda en <code>storage.local</code>.
+            resumen local. El filtro detecta tokens, claves y contraseñas conocidos antes de enviar.
+            La API key se guarda según el modo de seguridad de tokens.
           </p>
         </fieldset>
 

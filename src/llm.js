@@ -1,5 +1,17 @@
 import { requestJson, trimBase } from "./http.js";
-import { buildLlmMessages, fallbackSummary, normalizeEvidence } from "./summary.js";
+import {
+  buildEvidenceText,
+  buildLlmMessagesFromText,
+  fallbackSummary,
+  normalizeEvidence
+} from "./summary.js";
+import { formatFindings, redactText } from "./redact.js";
+
+function findingSummary(findings) {
+  const types = formatFindings(findings);
+  const total = findings.reduce((sum, finding) => sum + finding.count, 0);
+  return `${total} posible(s) secreto(s)${types ? `: ${types}` : ""}`;
+}
 
 export async function summarize(config, { date, projectName, evidence }) {
   const local = fallbackSummary(evidence, projectName);
@@ -9,6 +21,18 @@ export async function summarize(config, { date, projectName, evidence }) {
       text: local,
       source: "local",
       warning: "Sin LLM configurado. Se usó el resumen local."
+    };
+  }
+
+  const rawEvidence = buildEvidenceText(normalizeEvidence(evidence), date, projectName);
+  const filtered = redactText(rawEvidence);
+  const mode = config.llmFilterMode || "redact";
+
+  if (filtered.count > 0 && mode === "block") {
+    return {
+      text: local,
+      source: "local",
+      warning: `Se detectaron ${findingSummary(filtered.findings)}. No se envió nada al LLM.`
     };
   }
 
@@ -23,7 +47,7 @@ export async function summarize(config, { date, projectName, evidence }) {
         model: config.llmModel,
         temperature: 0.2,
         max_tokens: 500,
-        messages: buildLlmMessages(normalizeEvidence(evidence), date, projectName)
+        messages: buildLlmMessagesFromText(filtered.text)
       }),
       timeoutMs: 45000
     });
@@ -36,7 +60,10 @@ export async function summarize(config, { date, projectName, evidence }) {
     return {
       text,
       source: "llm",
-      warning: null,
+      warning:
+        filtered.count > 0
+          ? `Se redactaron ${findingSummary(filtered.findings)} antes de enviar al LLM.`
+          : null,
       usage: response.usage || null
     };
   } catch (error) {

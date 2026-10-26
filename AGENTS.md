@@ -54,6 +54,7 @@ background.js
         +-- src/gitlab.js
         +-- src/openproject.js
         +-- src/llm.js
+        +-- src/redact.js
         +-- src/summary.js
         +-- src/time.js
         +-- src/http.js
@@ -139,6 +140,9 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
 - `ensureOriginPermission()` debe llamarse dentro del gesto de usuario al guardar ajustes.
 - Revisar `SECURITY.md` antes de cambiar permisos, almacenamiento o flujos al LLM.
 - No enviar datos de GitLab al LLM sin que el usuario haya configurado explícitamente un endpoint.
+- Todo texto que vaya al LLM debe pasar por `redactText()` de `src/redact.js`.
+- El filtro tiene dos modos: `redact` y `block`. No eliminarlo ni saltarlo sin revisar `SECURITY.md`.
+- El filtro no garantiza detección total; no presentarlo como seguridad absoluta.
 - La caja se bloquea a los 15 minutos; no eliminar esa comprobación sin revisar la UX.
 
 ## Tests
@@ -154,7 +158,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **20/20 tests pasan**.
+Estado verificado: **24/24 tests pasan**.
 
 ## Estado actual y deuda técnica
 

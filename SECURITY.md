@@ -150,6 +150,29 @@ Los datos enviados al LLM pueden contener información interna o secretos accide
 - evita repositorios con secretos en commits;
 - considera un modelo local o el resumen local sin LLM.
 
+### Filtro pre-LLM
+
+Antes de llamar al LLM, `src/redact.js` busca patrones conocidos:
+
+- tokens de GitLab, OpenProject, GitHub y AWS;
+- claves de Google/OpenAI y similares;
+- JWT y claves privadas;
+- cabeceras `Authorization`/`Bearer`;
+- URLs con credenciales;
+- asignaciones `password=`, `token=`, `secret=`, etc.
+
+Modos:
+
+- **Redactar**: sustituye por `[REDACTED:...]` y avisa.
+- **Bloquear**: no envía nada al LLM y usa el resumen local.
+
+Límites:
+
+- es un filtro por expresiones regulares, no un analizador semántico;
+- no garantiza detectar secretos con formatos desconocidos;
+- no sustituye la revisión humana ni la política de datos de la empresa;
+- el resumen local puede seguir mostrando el texto original en la UI.
+
 ### OpenProject
 
 El token puede escribir fichajes. La extensión comprueba duplicados por día y proyecto, pero no sustituye una revisión humana. Revisa los fichajes antes de usarlos en producción.

@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG = {
   startTimeModeMigrated: false,
   llmBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   llmModel: "gemini-3.1-flash-lite",
+  llmFilterMode: "redact",
   defaultStart: "08:00",
   defaultEnd: "15:15"
 };

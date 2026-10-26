@@ -264,6 +264,7 @@ function populateSettings(config) {
 
   $("llmBaseUrl").value = config.llmBaseUrl;
   $("llmModel").value = config.llmModel;
+  $("llmFilterMode").value = config.llmFilterMode || "redact";
   $("gitlabToken").value = "";
   $("openprojectToken").value = "";
   $("llmApiKey").value = "";
@@ -342,6 +343,7 @@ function readSettings() {
     startTimeMode: $("startTimeMode").value || "browser",
     llmBaseUrl: $("llmBaseUrl").value.trim(),
     llmModel: $("llmModel").value.trim(),
+    llmFilterMode: $("llmFilterMode").value || "redact",
     defaultStart: $("start").value || current.defaultStart,
     defaultEnd: $("end").value || current.defaultEnd
   };

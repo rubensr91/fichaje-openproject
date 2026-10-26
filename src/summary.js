@@ -100,7 +100,7 @@ export function buildEvidenceText(evidence, date, projectName) {
   return truncate(lines.join("\n"), 9000);
 }
 
-export function buildLlmMessages(evidence, date, projectName) {
+export function buildLlmMessagesFromText(evidenceText) {
   return [
     {
       role: "system",
@@ -111,7 +111,11 @@ export function buildLlmMessages(evidence, date, projectName) {
     },
     {
       role: "user",
-      content: buildEvidenceText(evidence, date, projectName)
+      content: evidenceText
     }
   ];
+}
+
+export function buildLlmMessages(evidence, date, projectName) {
+  return buildLlmMessagesFromText(buildEvidenceText(evidence, date, projectName));
 }
