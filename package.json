@@ -1,0 +1,23 @@
+{
+  "name": "fichaje-extension",
+  "version": "0.1.7",
+  "description": "Extensión de navegador para resumir actividad de GitLab y fichar en OpenProject",
+  "private": true,
+  "license": "MIT",
+  "author": "Rubén Serena",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rubensr91/fichaje-openproject.git"
+  },
+  "homepage": "https://github.com/rubensr91/fichaje-openproject",
+  "bugs": {
+    "url": "https://github.com/rubensr91/fichaje-openproject/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

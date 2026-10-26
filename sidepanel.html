@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fichaje</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Fichaje diario</p>
+        <h1>GitLab → OpenProject</h1>
+      </div>
+      <button
+        id="settingsToggle"
+        class="icon-button"
+        type="button"
+        aria-label="Abrir ajustes"
+        aria-expanded="false"
+        title="Ajustes"
+      >
+        ⚙
+      </button>
+    </header>
+
+    <main>
+      <section id="setupNotice" class="notice info hidden">
+        <strong>Falta configuración.</strong>
+        <span>Abre los ajustes y completa GitLab y OpenProject.</span>
+      </section>
+
+      <section class="card main-card">
+        <label class="field">
+          <span>Día</span>
+          <input id="date" type="date" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Inicio</span>
+            <input id="start" type="time" step="900" />
+          </label>
+          <label class="field">
+            <span>Fin</span>
+            <input id="end" type="time" step="900" />
+          </label>
+        </div>
+
+        <div class="summary-line">
+          <span>Horas</span>
+          <strong id="hoursValue">7 h</strong>
+        </div>
+        <p id="rangeError" class="field-error hidden"></p>
+
+        <label class="field">
+          <span>Proyecto OpenProject</span>
+          <select id="projectSelect">
+            <option value="">Cargando proyectos...</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Buscar tarea</span>
+          <input
+            id="wpSearch"
+            type="search"
+            autocomplete="off"
+            placeholder="Código, asunto o estado..."
+          />
+        </label>
+
+        <label class="field">
+          <span>Work package</span>
+          <select id="wpSelect">
+            <option value="">Selecciona un proyecto</option>
+          </select>
+        </label>
+        <p id="wpCount" class="hint"></p>
+      </section>
+
+      <div class="actions">
+        <button id="generateBtn" class="button primary" type="button">Generar resumen</button>
+        <button id="postBtn" class="button secondary" type="button" disabled>Fichar</button>
+      </div>
+
+      <section id="summarySection" class="card hidden">
+        <div class="section-head">
+          <h2>Resumen</h2>
+          <span id="summarySource" class="badge hidden"></span>
+        </div>
+        <textarea
+          id="summary"
+          rows="7"
+          placeholder="El resumen aparecerá aquí. Puedes editarlo antes de fichar."
+        ></textarea>
+        <p id="evidenceHint" class="hint"></p>
+        <p id="summaryWarning" class="notice warn hidden"></p>
+      </section>
+
+      <section id="existingBox" class="notice warn hidden" aria-live="polite"></section>
+      <section id="statusBox" class="status hidden" aria-live="polite"></section>
+
+      <section id="settingsPanel" class="card settings hidden">
+        <div class="section-head">
+          <h2>Ajustes</h2>
+          <span class="hint">Se guardan solo en este navegador</span>
+        </div>
+
+        <fieldset>
+          <legend>GitLab</legend>
+          <label class="field">
+            <span>URL base</span>
+            <input id="gitlabBaseUrl" type="url" placeholder="https://gitlab.example.com" />
+          </label>
+          <label class="field">
+            <span>Proyecto</span>
+            <input id="gitlabProject" type="text" placeholder="grupo/proyecto" />
+          </label>
+          <label class="field">
+            <span>Token personal</span>
+            <input id="gitlabToken" type="password" autocomplete="off" placeholder="read_api" />
+          </label>
+          <label class="field">
+            <span>Autor GitLab <em>(opcional)</em></span>
+            <input id="gitlabAuthor" type="text" placeholder="tu nombre o email de commit" />
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>OpenProject</legend>
+          <label class="field">
+            <span>URL base</span>
+            <input id="openprojectBaseUrl" type="url" placeholder="https://openproject.example.com" />
+          </label>
+          <label class="field">
+            <span>ID o slug del proyecto</span>
+            <input id="openprojectProjectId" type="text" placeholder="123" />
+          </label>
+          <label class="field">
+            <span>ID del work package</span>
+            <input id="openprojectWorkPackageId" type="text" placeholder="456" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Actividad</span>
+              <input id="openprojectActivityName" type="text" value="Development" />
+            </label>
+            <label class="field">
+              <span>ID actividad</span>
+              <input id="openprojectActivityId" type="text" placeholder="Detectar" />
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="detectActivityBtn" class="button ghost small" type="button">
+              Detectar Development
+            </button>
+          </div>
+          <label class="field">
+            <span>Token personal</span>
+            <input id="openprojectToken" type="password" autocomplete="off" placeholder="opapi-..." />
+          </label>
+          <label class="checkbox-field">
+            <input id="sendStartTime" type="checkbox" />
+            <span>Enviar hora de inicio a OpenProject</span>
+          </label>
+          <label class="field">
+            <span>Modo de hora de inicio</span>
+            <select id="startTimeMode">
+              <option value="literal">Literal: 08:00 → 08:00Z</option>
+              <option value="openproject">Convertir a zona OpenProject</option>
+              <option value="browser">Convertir a zona del navegador</option>
+            </select>
+          </label>
+          <p class="hint">
+            Para esta instancia usa «Literal». Si OpenProject muestra otra hora, prueba los otros modos.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Modelo de resumen</legend>
+          <label class="field">
+            <span>Proveedor</span>
+            <select id="llmProvider">
+              <option value="gemini">Gemini</option>
+              <option value="qwen">Qwen</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset id="geminiSettings">
+          <legend>Gemini</legend>
+          <label class="field">
+            <span>URL base</span>
+            <input
+              id="geminiBaseUrl"
+              type="url"
+              placeholder="https://generativelanguage.googleapis.com/v1beta"
+            />
+          </label>
+          <label class="field">
+            <span>Modelo</span>
+            <input id="geminiModel" type="text" placeholder="gemini-3.1-flash" />
+          </label>
+          <label class="field">
+            <span>API key</span>
+            <input id="geminiApiKey" type="password" autocomplete="off" placeholder="AIza..." />
+          </label>
+          <p class="hint">
+            La key se guarda en <code>storage.local</code>. Se envía solo a Google Gemini.
+          </p>
+        </fieldset>
+
+        <fieldset id="qwenSettings">
+          <legend>Qwen</legend>
+          <label class="field">
+            <span>URL base compatible OpenAI</span>
+            <input
+              id="qwenBaseUrl"
+              type="url"
+              placeholder="https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+            />
+          </label>
+          <label class="field">
+            <span>Modelo</span>
+            <input id="qwenModel" type="text" placeholder="qwen3.6-flash" />
+          </label>
+          <label class="field">
+            <span>API key</span>
+            <input id="qwenApiKey" type="password" autocomplete="off" placeholder="sk-..." />
+          </label>
+          <p class="hint">
+            La key se guarda en <code>storage.local</code>. No se envía a GitLab ni a OpenProject.
+          </p>
+        </fieldset>
+
+        <div class="button-row">
+          <button id="saveSettingsBtn" class="button primary small" type="button">Guardar</button>
+          <button id="testBtn" class="button ghost small" type="button">Probar conexión</button>
+        </div>
+        <p id="settingsStatus" class="hint" aria-live="polite"></p>
+      </section>
+
+      <p id="version" class="version"></p>
+    </main>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
