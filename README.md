@@ -2,14 +2,16 @@
 
 [![tests](https://github.com/rubensr91/fichaje-openproject/actions/workflows/test.yml/badge.svg)](https://github.com/rubensr91/fichaje-openproject/actions/workflows/test.yml)
 
-Extensión de navegador para:
+Extensión de navegador para Chrome/Brave (Manifest V3, sin backend y sin build) que ficha tu jornada en OpenProject a partir de tu actividad de GitLab, en **un día o en un rango de días**:
 
-1. leer la actividad del día en un proyecto GitLab;
-2. generar un resumen con un LLM;
-3. revisarlo;
-4. crear un fichaje en OpenProject.
+1. Pregunta primero a OpenProject qué días **ya están fichados**. Esos días se muestran con su detalle y **no** se vuelven a consultar en GitLab ni se envían al LLM.
+2. Extrae de GitLab la actividad de los días pendientes: commits, merge requests e issues —y también comentarios en el modo global—, de **un proyecto concreto o de todos los proyectos** en los que hayas trabajado.
+3. **Filtra esa actividad antes de pasarla al LLM**: tokens, claves y contraseñas con formato conocido se sustituyen por `[REDACTED:...]` o, en modo estricto, se cancela el envío.
+4. Genera un **resumen por día** con cualquier LLM compatible con OpenAI Chat Completions (o un resumen local determinista si no lo configuras). El texto es editable.
+5. Permite **dividir cada día en varias líneas**, cada una con su tramo horario, su proyecto y su tarea de OpenProject.
+6. Crea los fichajes en OpenProject con duración, hora de inicio (opcional) y comentario, y vuelve a comprobar los duplicados en el momento de escribir.
 
-Pensada para Chrome/Brave, sin backend y sin build.
+Los tokens viven solo en memoria de la sesión del navegador o, si lo activas, en una caja cifrada con contraseña que se bloquea a los 15 minutos de inactividad.
 
 ## Flujo
 
@@ -26,7 +28,7 @@ Todo lo que va al LLM pasa antes por `src/redact.js`: sustituye los secretos rec
 
 ## Estado
 
-MVP, versión `0.1.33`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.34`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
