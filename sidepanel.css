@@ -207,6 +207,53 @@ main {
   line-height: 1.45;
 }
 
+.week-day .field > span {
+  font-size: 10px;
+}
+
+.week-wp {
+  font-size: 12px;
+  padding: 6px 8px;
+  min-height: 32px;
+}
+
+.week-hours {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-hour-field {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.week-hour-field > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.week-hour-field input[type="time"] {
+  min-height: 28px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.week-duration {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.week-duration.ok {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .locked-banner {
   border-color: var(--warn-line);
   background: var(--warn-bg);

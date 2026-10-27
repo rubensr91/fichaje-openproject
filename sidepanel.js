@@ -236,8 +236,82 @@ async function loadProjects() {
 function weeklyEligibleDays() {
   return state.weekly.days.filter(
     (day) =>
-      day.include && !day.posted && day.existing.length === 0 && day.summaryText.trim()
+      day.include &&
+      !day.posted &&
+      day.existing.length === 0 &&
+      day.summaryText.trim() &&
+      day.opProjectId &&
+      day.wpId &&
+      dayHours(day) !== null
   );
+}
+
+function dayHours(day) {
+  try {
+    return rangeHours(day.start, day.end);
+  } catch {
+    return null;
+  }
+}
+
+function dayHoursError(day) {
+  return dayHours(day) === null
+    ? "Tramo no válido: el fin debe ser posterior a la hora de inicio."
+    : null;
+}
+
+function weekProjectLabel(projectId) {
+  const project = state.projects.find((item) => item.id === String(projectId));
+  return project ? project.name : `Proyecto ${projectId}`;
+}
+
+function weekWorkPackageLabel(day) {
+  const workPackages = weekWorkPackages(day.opProjectId) || state.workPackages;
+  const workPackage = workPackages.find((item) => item.id === String(day.wpId));
+  if (!workPackage) {
+    return `#${day.wpId}`;
+  }
+  return `#${workPackage.code || workPackage.id} · ${workPackage.subject}`;
+}
+
+function weekWorkPackages(projectId) {
+  return state.weekly.wpCache?.[String(projectId)] || null;
+}
+
+async function loadWeekWorkPackages(projectId) {
+  const key = String(projectId);
+  if (!key) {
+    return [];
+  }
+  if (!state.weekly.wpCache) {
+    state.weekly.wpCache = {};
+  }
+  if (state.weekly.wpCache[key]) {
+    return state.weekly.wpCache[key];
+  }
+  const workPackages = await send({ type: "LIST_WORK_PACKAGES", projectId: key });
+  state.weekly.wpCache[key] = workPackages;
+  return workPackages;
+}
+
+function propagateGlobalHours() {
+  if (state.mode !== "weekly" || !state.weekly.days.length) {
+    return;
+  }
+  let changed = false;
+  for (const day of state.weekly.days) {
+    if (day.posted || day.existing.length || day.hoursEdited) {
+      continue;
+    }
+    day.start = $("start").value;
+    day.end = $("end").value;
+    changed = true;
+  }
+  if (changed) {
+    for (const day of state.weekly.days) {
+      repaintWeekDay(day);
+    }
+  }
 }
 
 function refreshPostButton() {
@@ -500,7 +574,7 @@ function renderSummary(result, day) {
 }
 
 function resetWeekly() {
-  state.weekly = { dates: [], days: [] };
+  state.weekly = { dates: [], days: [], wpCache: {} };
   $("weeklyDays").replaceChildren();
   $("weeklyProgress").textContent = "";
   $("weeklySection").classList.add("hidden");
@@ -518,7 +592,7 @@ function setMode(mode) {
   $("dateField").classList.toggle("hidden", weekly);
   $("weekFields").classList.toggle("hidden", !weekly);
   $("weekHint").classList.toggle("hidden", !weekly);
-  $("generateBtn").textContent = weekly ? "Generar semana" : "Generar resumen";
+  $("generateBtn").textContent = weekly ? "Generar resúmenes" : "Generar resumen";
   $("postBtn").textContent = "Fichar";
   state.posted = false;
   resetResult();
@@ -597,9 +671,156 @@ function renderWeekDay(day) {
     refreshPostButton();
   });
 
+  const hoursRow = document.createElement("div");
+  hoursRow.className = "week-hours";
+
+  const startField = document.createElement("label");
+  startField.className = "week-hour-field";
+  const startSpan = document.createElement("span");
+  startSpan.textContent = "Inicio";
+  const startInput = document.createElement("input");
+  startInput.type = "time";
+  startInput.step = 900;
+  startInput.value = day.start;
+  startInput.disabled = locked;
+  startInput.addEventListener("change", () => {
+    day.start = startInput.value;
+    day.hoursEdited = true;
+    repaintWeekDay(day);
+  });
+
+  const endField = document.createElement("label");
+  endField.className = "week-hour-field";
+  const endSpan = document.createElement("span");
+  endSpan.textContent = "Fin";
+  const endInput = document.createElement("input");
+  endInput.type = "time";
+  endInput.step = 900;
+  endInput.value = day.end;
+  endInput.disabled = locked;
+  endInput.addEventListener("change", () => {
+    day.end = endInput.value;
+    day.hoursEdited = true;
+    repaintWeekDay(day);
+  });
+
+  startField.append(startSpan, startInput);
+  endField.append(endSpan, endInput);
+
+  const duration = document.createElement("span");
+  duration.className = "week-duration";
+  const hours = dayHours(day);
+  duration.textContent = hours === null ? "—" : formatHours(hours);
+  if (hours !== null) {
+    duration.classList.add("ok");
+  }
+
+  hoursRow.append(startField, endField, duration);
+
+  const projectWrap = document.createElement("label");
+  projectWrap.className = "field";
+  const projectSpan = document.createElement("span");
+  projectSpan.textContent = "Proyecto OpenProject";
+  const projectSelect = document.createElement("select");
+  projectSelect.className = "week-wp";
+  projectSelect.disabled = locked;
+
+  const projectPlaceholder = document.createElement("option");
+  projectPlaceholder.value = "";
+  projectPlaceholder.textContent = state.projects.length
+    ? "Selecciona proyecto"
+    : "Sin proyectos disponibles";
+  projectSelect.append(projectPlaceholder);
+  for (const project of state.projects) {
+    const option = document.createElement("option");
+    option.value = project.id;
+    option.textContent = project.name;
+    projectSelect.append(option);
+  }
+  if (day.opProjectId && !state.projects.some((project) => project.id === day.opProjectId)) {
+    const option = document.createElement("option");
+    option.value = day.opProjectId;
+    option.textContent = weekProjectLabel(day.opProjectId);
+    projectSelect.append(option);
+  }
+  projectSelect.value = day.opProjectId;
+  projectSelect.addEventListener("change", async () => {
+    day.opProjectId = projectSelect.value;
+    day.opProjectEdited = true;
+    day.wpId = "";
+    day.existing = [];
+    day.include = day.hasActivity;
+    repaintWeekDay(day);
+    if (day.opProjectId) {
+      try {
+        await loadWeekWorkPackages(day.opProjectId);
+      } catch (error) {
+        day.error = error.message;
+      }
+      repaintWeekDay(day);
+    }
+    refreshPostButton();
+  });
+  projectWrap.append(projectSpan, projectSelect);
+
+  const dayWorkPackages = weekWorkPackages(day.opProjectId);
+  const wpWrap = document.createElement("label");
+  wpWrap.className = "field";
+  const wpLabel = document.createElement("span");
+  wpLabel.textContent = "Tarea";
+  const wpSelect = document.createElement("select");
+  wpSelect.className = "week-wp";
+  wpSelect.disabled = locked || !day.opProjectId;
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = !day.opProjectId
+    ? "Selecciona un proyecto"
+    : dayWorkPackages === null
+      ? "Cargando tareas..."
+      : dayWorkPackages.length
+        ? "Selecciona tarea"
+        : "Sin work packages";
+  wpSelect.append(placeholder);
+
+  for (const workPackage of dayWorkPackages || []) {
+    const option = document.createElement("option");
+    option.value = workPackage.id;
+    const status = workPackage.status ? ` [${workPackage.status}]` : "";
+    const code = workPackage.code || workPackage.id;
+    option.textContent = `#${code} · ${workPackage.subject}${status}`;
+    wpSelect.append(option);
+  }
+
+  // Mantén visible la tarea del día aunque no esté en la lista cargada.
+  if (day.wpId && !(dayWorkPackages || []).some((workPackage) => workPackage.id === day.wpId)) {
+    const option = document.createElement("option");
+    option.value = day.wpId;
+    option.textContent = `#${day.wpId}`;
+    wpSelect.append(option);
+  }
+  wpSelect.value = day.wpId;
+
+  wpSelect.addEventListener("change", () => {
+    day.wpId = wpSelect.value;
+    day.wpEdited = true;
+    repaintWeekDay(day);
+  });
+
+  wpWrap.append(wpLabel, wpSelect);
+
   const warn = document.createElement("p");
   warn.className = "week-warn";
-  const warnText = [...day.warnings, day.skipReason, day.error].filter(Boolean).join(" ");
+  const warnText = [
+    ...day.warnings,
+    day.skipReason,
+    day.error,
+    locked ? null : dayHoursError(day),
+    locked || day.opProjectId ? null : "Selecciona el proyecto de OpenProject para este día.",
+    locked || !day.opProjectId || day.wpId ? null : "Selecciona la tarea a fichar en este día."
+  ]
+    .filter(Boolean)
+    .join(" ");
   if (warnText) {
     warn.textContent = warnText;
   } else {
@@ -607,7 +828,7 @@ function renderWeekDay(day) {
   }
 
   head.append(title, badges);
-  card.append(head, textarea, warn);
+  card.append(head, hoursRow, projectWrap, wpWrap, textarea, warn);
   return card;
 }
 
@@ -621,6 +842,52 @@ function repaintWeekDay(day) {
     wrap.append(fresh);
   }
   refreshPostButton();
+}
+
+function propagateGlobalWorkPackage() {
+  if (state.mode !== "weekly" || !state.weekly.days.length) {
+    return;
+  }
+  const projectId = String(state.config?.openprojectProjectId || "");
+  const wpId = state.config?.openprojectWorkPackageId || "";
+  let changed = false;
+  for (const day of state.weekly.days) {
+    if (day.posted || day.existing.length || day.opProjectEdited || day.wpEdited) {
+      continue;
+    }
+    if (String(day.opProjectId) === projectId && day.wpId !== wpId) {
+      day.wpId = wpId;
+      changed = true;
+    }
+  }
+  if (changed) {
+    for (const day of state.weekly.days) {
+      repaintWeekDay(day);
+    }
+  }
+}
+
+function propagateGlobalProject() {
+  if (state.mode !== "weekly" || !state.weekly.days.length) {
+    return;
+  }
+  const projectId = String(state.config?.openprojectProjectId || "");
+  let changed = false;
+  for (const day of state.weekly.days) {
+    if (day.posted || day.existing.length || day.opProjectEdited) {
+      continue;
+    }
+    if (String(day.opProjectId) !== projectId) {
+      day.opProjectId = projectId;
+      day.wpId = state.config?.openprojectWorkPackageId || "";
+      changed = true;
+    }
+  }
+  if (changed) {
+    for (const day of state.weekly.days) {
+      repaintWeekDay(day);
+    }
+  }
 }
 
 function renderWeekDays() {
@@ -677,6 +944,10 @@ async function generateWeek() {
     ]);
 
     state.weekly.dates = dates;
+    state.weekly.wpCache = {};
+    if (state.config.openprojectProjectId) {
+      state.weekly.wpCache[String(state.config.openprojectProjectId)] = state.workPackages;
+    }
     state.weekly.days = days.map((evidence) => {
       const existingEntries = existing.byDate?.[evidence.date] || [];
       const counts = evidence.counts || {};
@@ -698,7 +969,14 @@ async function generateWeek() {
         ].filter(Boolean),
         userEdited: false,
         skipReason: null,
-        error: null
+        error: null,
+        start: $("start").value || state.config.defaultStart || "08:00",
+        end: $("end").value || state.config.defaultEnd || "15:15",
+        hoursEdited: false,
+        opProjectId: String(state.config.openprojectProjectId || ""),
+        opProjectEdited: false,
+        wpId: state.config.openprojectWorkPackageId || "",
+        wpEdited: false
       };
     });
     renderWeekDays();
@@ -719,6 +997,15 @@ async function generateWeek() {
         continue;
       }
 
+      // Asegura las tareas del proyecto del día antes del primer pintado completo.
+      if (day.opProjectId && !weekWorkPackages(day.opProjectId)) {
+        try {
+          await loadWeekWorkPackages(day.opProjectId);
+        } catch {
+          // Si falla, la tarjeta mostrará "Cargando tareas..." y se podrá reintentar al cambiar.
+        }
+      }
+
       const result = await send({
         type: "GENERATE_SUMMARY",
         date: day.date,
@@ -736,7 +1023,7 @@ async function generateWeek() {
 
     $("weeklyProgress").textContent = "";
     $("existingBox").classList.add("hidden");
-    setStatus("Semana lista. Revísala y pulsa Fichar.");
+    setStatus("Resúmenes listos. Revisa cada día y pulsa Fichar.");
   } catch (error) {
     setStatus(error.message, "error");
   } finally {
@@ -756,23 +1043,53 @@ async function postWeek() {
     return;
   }
 
-  const start = $("start").value;
-  const end = $("end").value;
-  const hours = currentRange();
-  if (hours === null) {
-    setStatus("Revisa el tramo horario.", "error");
-    return;
-  }
-
   const targets = weeklyEligibleDays();
   if (!targets.length) {
-    setStatus("No hay días para fichar. Revisa marcas y resúmenes.", "error");
+    const invalidHours = state.weekly.days.filter(
+      (day) =>
+        day.include &&
+        !day.posted &&
+        day.existing.length === 0 &&
+        day.summaryText.trim() &&
+        day.opProjectId &&
+        day.wpId &&
+        dayHours(day) === null
+    ).length;
+    const missingWp = state.weekly.days.filter(
+      (day) =>
+        day.include &&
+        !day.posted &&
+        day.existing.length === 0 &&
+        day.summaryText.trim() &&
+        day.opProjectId &&
+        !day.wpId &&
+        dayHours(day) !== null
+    ).length;
+    const missingProject = state.weekly.days.filter(
+      (day) =>
+        day.include &&
+        !day.posted &&
+        day.existing.length === 0 &&
+        day.summaryText.trim() &&
+        !day.opProjectId &&
+        dayHours(day) !== null
+    ).length;
+    if (invalidHours) {
+      setStatus("Hay días con tramo horario no válido. Corrige inicio y fin en sus tarjetas.", "error");
+    } else if (missingProject) {
+      setStatus("Hay días sin proyecto de OpenProject. Elige el proyecto en sus tarjetas.", "error");
+    } else if (missingWp) {
+      setStatus("Hay días sin tarea seleccionada. Elige el work package en sus tarjetas.", "error");
+    } else {
+      setStatus("No hay días para fichar. Revisa marcas y resúmenes.", "error");
+    }
     return;
   }
 
-  const lines = targets.map(
-    (day) => `• ${day.date}: ${formatHours(hours)} (${start}–${end})`
-  );
+  const lines = targets.map((day) => {
+    const hours = dayHours(day);
+    return `• ${day.date}: ${formatHours(hours)} (${day.start}–${day.end}) → ${weekProjectLabel(day.opProjectId)} · ${weekWorkPackageLabel(day)}`;
+  });
   const confirmed = window.confirm(
     `¿Fichar ${targets.length} día(s) en OpenProject?\n\n${lines.join("\n")}`
   );
@@ -789,8 +1106,10 @@ async function postWeek() {
       type: "CREATE_ENTRIES",
       entries: targets.map((day) => ({
         date: day.date,
-        start,
-        end,
+        start: day.start,
+        end: day.end,
+        projectId: day.opProjectId,
+        workPackageId: day.wpId,
         comment: day.summaryText.trim()
       }))
     });
@@ -1214,8 +1533,19 @@ async function init() {
       openprojectWorkPackageId: ""
     });
     syncSelectionFields();
+    if (state.mode === "weekly" && state.weekly.days.length) {
+      // Conserva los resúmenes generados: propaga el proyecto a los días no editados
+      // y precarga sus tareas.
+      try {
+        await loadWeekWorkPackages(projectId);
+      } catch (error) {
+        setStatus(error.message, "error");
+      }
+      propagateGlobalProject();
+    } else {
+      resetWeekly();
+    }
     resetResult();
-    resetWeekly();
     setStatus("");
     await loadWorkPackages(projectId);
   });
@@ -1230,8 +1560,8 @@ async function init() {
     });
     syncSelectionFields();
     resetResult();
-    resetWeekly();
     setStatus("");
+    propagateGlobalWorkPackage();
   });
 
   $("testBtn").addEventListener("click", testConnections);
@@ -1260,6 +1590,8 @@ async function init() {
     currentRange();
     refreshPostButton();
   });
+  $("start").addEventListener("change", propagateGlobalHours);
+  $("end").addEventListener("change", propagateGlobalHours);
   $("summary").addEventListener("input", refreshPostButton);
 
   $("date").addEventListener("change", () => {

@@ -80,13 +80,15 @@ background.js
 - Token con `read_api` o `api`. `read_user` solo no sirve.
 - `isConfigured` solo exige `gitlabProject` en modo `project`.
 
-### Modo semanal
+### Modo rango (varios días)
 
 - Mensajes nuevos en `background.js`: `FETCH_RANGE`, `CHECK_EXISTING_RANGE`, `CREATE_ENTRIES`.
 - `CHECK_EXISTING_RANGE` agrupa fichajes por día con `spent_on =d` multi-fecha (`getExistingEntriesForDates`).
-- `CREATE_ENTRIES` comprueba duplicados, detecta la actividad una vez y crea día a día, saltando los que ya tienen fichaje. Devuelve `created`/`skipped`/`failed`.
-- El panel muestra una tarjeta por día con resumen editable y casilla de inclusión; los días sin actividad quedan desmarcados.
-- El tramo horario es el mismo para todos los días del rango.
+- `CREATE_ENTRIES` comprueba duplicados por día y por proyecto (cada ítem admite `projectId` y `workPackageId` propios; si faltan, usan la config), detecta la actividad una vez y crea día a día, saltando los que ya tienen fichaje. Devuelve `created`/`skipped`/`failed`.
+- El panel muestra una tarjeta por día con resumen editable, casilla de inclusión, tramo horario propio y selector de tarea; los días sin actividad quedan desmarcados.
+- Cada día del rango puede tener su propio tramo horario (inicio/fin en la tarjeta). El tramo global solo inicializa los días no editados (`propagateGlobalHours`). Un tramo invertido invalida ese día y no se ficha.
+- Cada día puede tener su propio proyecto (`day.opProjectId`, selector en la tarjeta). Las tareas se cargan por proyecto con caché (`loadWeekWorkPackages` / `wpCache`); cambiar el proyecto de un día limpia su tarea y su estado de duplicado. Los cambios en el selector global de proyecto se propagan a los días no editados (`propagateGlobalProject`). Un día sin proyecto queda descartado.
+- Cada día también puede tener su propio work package (`day.wpId` con `<select>` por tarjeta). El work package global solo inicializa los días no editados (`propagateGlobalWorkPackage`). Un día sin `wpId` queda descartado.
 
 ### Resumen
 
@@ -168,13 +170,13 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **36/36 tests pasan**.
+Estado verificado: **44/44 tests pasan**.
 
 ## Estado actual y deuda técnica
 
-- Un solo proyecto GitLab por configuración; el modo «Todas las contribuciones» agrega eventos de todos los proyectos sin detalle completo.
-- Varios proyectos OpenProject, uno por fichaje.
-- En modo semanal, un único tramo horario compartido por todos los días.
+- Una sola instancia GitLab por configuración; el modo por defecto «Todas las contribuciones» lee el detalle completo de todos los proyectos accesibles.
+- Varios proyectos OpenProject; cada fichaje (día) apunta a uno.
+- En modo rango cada día tiene su tramo horario, su proyecto y su work package (los selectores globales solo inicializan los días no editados).
 - Actividad fija `Development`.
 - Sin tests de integración ni E2E con navegador.
 - Sin i18n.

@@ -135,10 +135,21 @@ async function handle(message) {
     }
 
     case "CREATE_ENTRIES": {
-      const dates = message.entries.map((item) => item.date);
       const user = await getCurrentUser(config);
-      const existing = await getExistingEntriesForDates(config, dates, user);
-      const byDate = groupEntriesByDate(existing);
+      const defaultProject = String(config.openprojectProjectId || "");
+
+      // Duplicados: mismo día y mismo proyecto (el proyecto puede variar por ítem).
+      const projectIds = [
+        ...new Set(message.entries.map((item) => String(item.projectId || defaultProject)))
+      ];
+      const existingByProject = new Map();
+      for (const projectId of projectIds) {
+        const dates = message.entries
+          .filter((item) => String(item.projectId || defaultProject) === projectId)
+          .map((item) => item.date);
+        const existing = await getExistingEntriesForDates(config, dates, user, projectId);
+        existingByProject.set(projectId, groupEntriesByDate(existing));
+      }
 
       const activity = await detectActivity(
         config,
@@ -147,7 +158,9 @@ async function handle(message) {
 
       const results = { created: [], skipped: [], failed: [] };
       for (const item of message.entries) {
-        const already = byDate.get(item.date) || [];
+        const projectId = String(item.projectId || defaultProject);
+        const byDate = existingByProject.get(projectId);
+        const already = byDate?.get(item.date) || [];
         if (already.length) {
           results.skipped.push({
             date: item.date,
@@ -161,6 +174,8 @@ async function handle(message) {
             start: item.start,
             end: item.end,
             comment: item.comment,
+            workPackageId: item.workPackageId,
+            projectId,
             activity
           });
           results.created.push({
@@ -168,7 +183,9 @@ async function handle(message) {
             id: entry.id,
             hours: entry.hours || null
           });
-          byDate.set(item.date, [entry]);
+          if (byDate) {
+            byDate.set(item.date, [entry]);
+          }
         } catch (error) {
           results.failed.push({ date: item.date, error: error.message });
         }

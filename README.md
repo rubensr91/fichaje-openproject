@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.16`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.19`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -100,31 +100,32 @@ El filtro reduce el riesgo, pero **no garantiza** detectar cualquier secreto. Un
 
 El tramo se puede cambiar antes de generar el resumen.
 
-### Modo semanal
+### Modo rango (varios días)
 
-Además del modo diario, la extensión tiene un modo **Semanal**:
+Además del modo diario, la extensión tiene un modo **Rango**:
 
-1. Cambia el interruptor a **Semanal**.
+1. Cambia el interruptor a **Rango**.
 2. Elige el rango de días (por defecto, lunes a viernes de la semana actual; máximo 31 días).
-3. Pulsa **Generar semana**.
+3. Pulsa **Generar resúmenes**.
 4. La extensión lee GitLab para cada día, pide un resumen al LLM día a día y muestra una tarjeta por día.
-5. Revisa y edita cada resumen, marca o desmarca los días a fichar.
-6. Pulsa **Fichar** y confirma una vez con el listado de días.
+5. Revisa y edita cada resumen, ajusta el **tramo horario**, el **proyecto** y la **tarea** de cada día, y marca o desmarca los días a fichar.
+6. Pulsa **Fichar** y confirma una vez con el listado de días con sus horas.
 
 Detalles:
 
-- El tramo horario (inicio/fin) se aplica igual a todos los días.
+- Cada tarjeta tiene sus propios campos de inicio y fin, su selector de **proyecto de OpenProject** y su selector de **tarea** (work package). Las tareas de la tarjeta se cargan según el proyecto elegido en esa tarjeta. El tramo global, el proyecto global y la tarea global actúan solo como valor inicial; si los cambias después, se propagarán a los días que no hayas editado a mano.
 - Los días sin actividad en GitLab quedan **desmarcados** por defecto (con su texto local); puedes marcarlos y editar el texto a mano.
 - Los días que ya tienen un fichaje en ese proyecto aparecen como **Ya fichado** y se omiten automáticamente.
+- Un tramo invertido (fin ≤ inicio) o un día sin tarea seleccionada invalida ese día y no se ficha; el aviso aparece en la tarjeta.
 - Si algún día falla al crear, el resto sigue; el error se muestra en su tarjeta y puedes volver a intentarlo.
 
 ## Uso
 
-1. Elige el modo: diario o semanal.
+1. Elige el modo: diario o rango.
 2. Elige el día (o el rango de días).
-3. Ajusta inicio y fin.
+3. Ajusta inicio y fin (en modo rango puedes ajustarlos por día).
 4. Elige el proyecto de OpenProject y el work package.
-5. Pulsa **Generar resumen** (o **Generar semana**).
+5. Pulsa **Generar resumen** (o **Generar resúmenes**).
 6. Revisa y edita el texto.
 7. Pulsa **Fichar**.
 8. Confirma.
@@ -183,9 +184,9 @@ En **Ajustes → Seguridad de tokens**:
 
 ## Limitaciones actuales
 
-- Un solo proyecto GitLab.
-- Varios proyectos OpenProject, pero solo uno por fichaje.
-- En modo semanal, un único tramo horario compartido por todos los días.
+- Una sola instancia GitLab por configuración (el modo «Todas las contribuciones» lee todos sus proyectos).
+- Varios proyectos OpenProject; cada fichaje (día) apunta a uno de ellos.
+- En modo rango, el proyecto, la tarea y el tramo horario son configurables por día (los selectores globales inicializan los días que no hayas tocado).
 - La actividad está fijada a `Development`.
 - La detección de autoría de commits puede requerir configurar `Autor GitLab`.
 - No hay tests de integración contra GitLab/OpenProject.

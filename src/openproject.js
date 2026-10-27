@@ -235,10 +235,11 @@ export async function getExistingEntries(config, date, user) {
   return getExistingEntriesForDates(config, [date], user);
 }
 
-export async function getExistingEntriesForDates(config, dates, user) {
+export async function getExistingEntriesForDates(config, dates, user, projectId = "") {
   if (!Array.isArray(dates) || dates.length === 0) {
     throw new Error("Faltan fechas para comprobar fichajes");
   }
+  const targetProject = String(projectId || config.openprojectProjectId || "").trim();
 
   const filters = [
     { spent_on: { operator: "=d", values: dates } },
@@ -251,7 +252,7 @@ export async function getExistingEntriesForDates(config, dates, user) {
   });
 
   const entries = collection?._embedded?.elements || [];
-  return entries.filter((entry) => projectHrefMatches(entry, config.openprojectProjectId));
+  return entries.filter((entry) => projectHrefMatches(entry, targetProject));
 }
 
 function activityHref(config, activity) {
@@ -261,9 +262,21 @@ function activityHref(config, activity) {
   return `/api/v3/time_entries/activities/${activity.id}`;
 }
 
-export async function createTimeEntry(config, { date, start, end, comment, activity }) {
+export async function createTimeEntry(
+  config,
+  { date, start, end, comment, activity, workPackageId, projectId }
+) {
   if (!comment || !comment.trim()) {
     throw new Error("El comentario no puede estar vacío");
+  }
+
+  const wpId = String(workPackageId || config.openprojectWorkPackageId || "").trim();
+  if (!wpId) {
+    throw new Error("Falta el work package de OpenProject");
+  }
+  const opProjectId = String(projectId || config.openprojectProjectId || "").trim();
+  if (!opProjectId) {
+    throw new Error("Falta el proyecto de OpenProject");
   }
 
   const hours = rangeHours(start, end);
@@ -274,8 +287,8 @@ export async function createTimeEntry(config, { date, start, end, comment, activ
     hours: hoursToDuration(hours),
     comment: { raw: comment.trim().slice(0, 1000) },
     _links: {
-      project: { href: `/api/v3/projects/${config.openprojectProjectId}` },
-      entity: { href: `/api/v3/work_packages/${config.openprojectWorkPackageId}` },
+      project: { href: `/api/v3/projects/${opProjectId}` },
+      entity: { href: `/api/v3/work_packages/${wpId}` },
       activity: { href: activityHref(config, activity) }
     }
   };

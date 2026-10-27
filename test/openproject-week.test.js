@@ -82,6 +82,48 @@ test("comprueba fichajes existentes para varias fechas y filtra por proyecto", a
   }
 });
 
+test("filtra por el proyecto indicado aunque la config tenga otro", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes("/time_entries")) {
+      return jsonResponse({
+        _embedded: {
+          elements: [
+            { id: 1, spentOn: "2026-10-26", _links: { project: { href: "/api/v3/projects/101" } } },
+            { id: 2, spentOn: "2026-10-26", _links: { project: { href: "/api/v3/projects/102" } } },
+            { id: 3, spentOn: "2026-10-27", _links: { project: { href: "/api/v3/projects/102" } } }
+          ]
+        }
+      });
+    }
+    throw new Error(`Petición inesperada: ${target}`);
+  };
+
+  try {
+    const entries = await getExistingEntriesForDates(
+      config,
+      ["2026-10-26", "2026-10-27"],
+      { id: 28 },
+      "102"
+    );
+    assert.deepEqual(
+      entries.map((entry) => entry.id),
+      [2, 3]
+    );
+
+    // Sin override, sigue filtrando por el proyecto de la config (101).
+    const fallback = await getExistingEntriesForDates(config, ["2026-10-26"], { id: 28 });
+    assert.deepEqual(
+      fallback.map((entry) => entry.id),
+      [1]
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rechaza una lista de fechas vacía", async () => {
   await assert.rejects(getExistingEntriesForDates(config, [], { id: 28 }), /fechas/);
 });
