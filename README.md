@@ -11,9 +11,37 @@ Extensión de navegador para:
 
 Pensada para Chrome/Brave, sin backend y sin build.
 
+## Flujo
+
+```mermaid
+flowchart LR
+    EXT["Extensión MV3<br/>(panel + service worker)"]
+    OP[("OpenProject<br/>API v3")]
+    GL[("GitLab<br/>API v4")]
+    RED["Filtro de secretos<br/>redact / block"]
+    LLM[["LLM compatible<br/>OpenAI Chat Completions"]]
+
+    OP -- "1 · proyectos, tareas y fichajes ya hechos<br/>GET /time_entries" --> EXT
+    EXT -- "2 · actividad solo de los días sin fichar<br/>commits, MRs, issues, comentarios" --> GL
+    GL -- "3 · evidencia por día" --> EXT
+    EXT -- "4 · texto de evidencia" --> RED
+    RED -- "5 · texto limpio" --> LLM
+    LLM -- "6 · resumen editable" --> EXT
+    EXT -- "7 · POST /time_entries<br/>una línea por tarea" --> OP
+```
+
+Pasos:
+
+1. Se leen de OpenProject los proyectos/tareas disponibles y los fichajes ya existentes del rango.
+2. Con eso se filtran los días: los ya fichados **no** se piden a GitLab ni se envían al LLM (ahorro de tokens).
+3. GitLab aporta la actividad (commits, MRs, issues, comentarios) del usuario, de uno o de todos los proyectos.
+4. Antes de llamar al LLM, el texto pasa por un filtro de secretos que redacta o bloquea.
+5. El LLM devuelve un resumen por día; se puede editar y dividir en varias tareas.
+6. Con la confirmación, la extensión inyecta los resúmenes en OpenProject como time entries, con su proyecto, tarea, tramo horario y hora de inicio.
+
 ## Estado
 
-MVP, versión `0.1.30`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.31`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
