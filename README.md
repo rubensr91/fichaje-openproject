@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.27`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.30`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -130,7 +130,7 @@ Detalles:
 - Cada línea tiene su **tramo horario** (inicio y fin), su **proyecto de OpenProject** y su **tarea** (work package), cada uno en su propia fila. Bajo el selector de tarea hay un **buscador**: filtra por código, asunto, estado o tipo, y si el texto coincide exactamente con el código (`1234` o `#1234`) o el nombre de la tarea, la **autoselecciona**. El tramo global, el proyecto global y la tarea global actúan solo como valor inicial; si los cambias después, se propagarán a las líneas que no hayas editado a mano.
 - Puedes **dividir el día en varias líneas** con **+ Añadir tarea**: cada una con su tramo, proyecto, tarea y resumen. Ver [Líneas dentro de un día](#líneas-dentro-de-un-día).
 - Los días sin actividad en GitLab quedan **desmarcados** por defecto (con su texto local); puedes marcarlos y editar el texto a mano.
-- Los días que ya tienen un fichaje en ese proyecto muestran la primera línea como **existente (desmarcado)** y se omiten al fichar; las líneas añadidas a propósito sí se crean. La comprobación consulta los fichajes uno por día (el filtro por rango no es compatible con todas las instancias de OpenProject), así que detecta todos los días fichados del rango. En rangos largos hay más peticiones a OpenProject, algo más lentas de generar.
+- Los días que ya tienen un fichaje en ese proyecto muestran la primera línea como **existente (desmarcado)** y se omiten al fichar; las líneas añadidas a propósito sí se crean. La comprobación consulta los fichajes uno por día (el filtro por rango no es compatible con todas las instancias de OpenProject), así que detecta todos los días fichados del rango. La tarjeta del día muestra esos fichajes ya hechos en un bloque **Ya fichado en OpenProject** con proyecto, tarea, horas totales y **hora de inicio y fin** de cada entrada (más su resumen y su ID). Se muestran **todas** las entradas del día, también las de otros proyectos de OpenProject; el bloqueo automático de la primera línea solo se aplica al proyecto seleccionado. El fin se calcula sumando la duración al `startTime` y ambas horas se muestran en la zona horaria del navegador. En rangos largos hay más peticiones a OpenProject, algo más lentas de generar.
 - Un tramo invertido (fin ≤ inicio) o una línea sin tarea seleccionada invalida esa línea y no se ficha; el aviso aparece en la tarjeta.
 - Si alguna línea falla al crear, el resto sigue; el error se muestra en su tarjeta y puedes volver a intentarla.
 

@@ -85,6 +85,7 @@ background.js
 
 - Mensajes nuevos en `background.js`: `FETCH_RANGE`, `CHECK_EXISTING_RANGE`, `CREATE_ENTRIES`.
 - `CHECK_EXISTING_RANGE` consulta los existentes **una petición por día** con `spent_on =d` mono-valor, paginación (≤3 páginas) y recorte por proyecto en cliente (`getExistingEntriesForDates`). Ni `=d` multi-fecha (devuelve solo parte de los días) ni `><` (algunas instancias lo rechazan con 400 «Filters is not set to one of the allowed values») son fiables. El mensaje acepta `projectId` opcional. Con rangos largos esto multiplica peticiones: 31 días ≈ 31 GET.
+- El panel lista **todos** los fichajes del día (bloque «Ya fichado en OpenProject»: proyecto, tarea, horas, inicio/fin y resumen) usando `parseLoggedEntry` de `src/weekly.js` sobre el HAL de cada entry. `CHECK_EXISTING(_RANGE)` trae `allEntries`/`allByDate` (sin filtro de proyecto) además de `entries`/`byDate` (proyecto objetivo) mediante `splitExisting`; el bloqueo de la primera línea usa solo el proyecto objetivo. `getExistingEntriesForDates` acepta `projectId: "*"` para saltar el filtro. Las horas de inicio/fin se derivan con `loggedTimeRange(startTime, hours)` (`src/weekly.js`): `startTime` es un instante UTC y el fin es inicio + `durationToMinutes(hours)`, mostrado en la zona del navegador.
 - `CREATE_ENTRIES` recibe `{ lineId, date, start, end, projectId, workPackageId, comment, allowExisting }`. Detecta la actividad una vez. La política de duplicados vive en `src/weekly.js::planEntryActions` (consumir-una: los existentes del par (día, proyecto) se asignan a las primeras líneas no-`allowExisting`; el resto se crea). Devuelve `created`/`skipped`/`failed` con `lineId`.
 - El panel comparte motor para Diario y Rango: `state.weekly.days[]` con `lines[]`. Cada línea tiene casilla, tramo, proyecto, tarea y resumen propios. Botón **+ Añadir tarea** por tarjeta (siempre activo); el resumen del LLM rellena la primera línea (casilla «Fichar este día»; extras «Fichar esta tarea»).
 - Al generar, **primero** se consultan los fichajes existentes (`CHECK_EXISTING_RANGE`/`CHECK_EXISTING`) y **después** GitLab solo para los días sin fichar (`FETCH_RANGE` con las fechas pendientes). Los días ya fichados tampoco se envían al LLM (`summarizeDay` sale antes).
@@ -173,7 +174,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **53/53 tests pasan**.
+Estado verificado: **61/61 tests pasan**.
 
 ## Estado actual y deuda técnica
 

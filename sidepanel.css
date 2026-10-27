@@ -255,6 +255,53 @@ main {
   margin-left: auto;
 }
 
+.week-logged {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.week-logged-title {
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.week-logged-item {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 6px;
+}
+
+.week-logged-item + .week-logged-item {
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+}
+
+.week-logged-meta {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.week-logged-comment {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.week-logged-id {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .week-line-targets {
   display: grid;
   gap: 8px;

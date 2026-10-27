@@ -213,6 +213,31 @@ test("filtra por el proyecto indicado aunque la config tenga otro", async () => 
   }
 });
 
+test('projectId "*" devuelve los entries de todos los proyectos', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    jsonResponse({
+      _embedded: {
+        elements: [
+          { id: 1, spentOn: "2026-10-26", _links: { project: { href: "/api/v3/projects/101" } } },
+          { id: 2, spentOn: "2026-10-26", _links: { project: { href: "/api/v3/projects/102" } } },
+          { id: 3, spentOn: "2026-10-26", _links: { project: { href: "/api/v3/projects/103" } } }
+        ]
+      }
+    });
+
+  try {
+    const all = await getExistingEntriesForDates(config, ["2026-10-26"], { id: 28 }, "*");
+    assert.deepEqual(all.map((entry) => entry.id), [1, 2, 3]);
+
+    const only101 = await getExistingEntriesForDates(config, ["2026-10-26"], { id: 28 });
+    assert.deepEqual(only101.map((entry) => entry.id), [1]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rechaza una lista de fechas vacía", async () => {
   await assert.rejects(getExistingEntriesForDates(config, [], { id: 28 }), /fechas/);
 });

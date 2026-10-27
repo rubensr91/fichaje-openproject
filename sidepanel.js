@@ -19,7 +19,12 @@ import {
   rangeHours,
   todayISO
 } from "./src/time.js";
-import { autoSelectWorkPackage, filterWorkPackages } from "./src/weekly.js";
+import {
+  autoSelectWorkPackage,
+  filterWorkPackages,
+  loggedTimeRange,
+  parseLoggedEntry
+} from "./src/weekly.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -279,6 +284,15 @@ function dayHoursError(target) {
 function weekProjectLabel(projectId) {
   const project = state.projects.find((item) => item.id === String(projectId));
   return project ? project.name : `Proyecto ${projectId}`;
+}
+
+function timePart(item) {
+  const duration = item.hours ? formatDurationISO(item.hours) : "";
+  const range = loggedTimeRange(item.startTime, item.hours);
+  if (!range) {
+    return duration ? `${duration} · sin horas` : "sin horas";
+  }
+  return duration ? `${duration} (${range.start}–${range.end})` : `${range.start}–${range.end}`;
 }
 
 function weekWorkPackages(projectId) {
@@ -636,7 +650,7 @@ function makeLine(overrides = {}) {
   };
 }
 
-function buildDays(dates, evidenceByDate, existingByDate, existingError) {
+function buildDays(dates, evidenceByDate, existingByDate, existingError, allByDate = {}) {
   state.weekly.dates = dates;
   state.weekly.wpCache = {};
   if (state.config.openprojectProjectId) {
@@ -645,6 +659,7 @@ function buildDays(dates, evidenceByDate, existingByDate, existingError) {
   state.weekly.days = dates.map((date) => {
     const evidence = evidenceByDate[date];
     const existingEntries = existingByDate[date] || [];
+    const logged = (allByDate[date] || existingEntries).map(parseLoggedEntry);
     const counts = evidence?.counts || {};
     const hasActivity =
       (counts.commits || 0) + (counts.mergeRequests || 0) + (counts.issues || 0) > 0;
@@ -653,15 +668,16 @@ function buildDays(dates, evidenceByDate, existingByDate, existingError) {
       include: hasActivity && existingEntries.length === 0
     });
     if (existingEntries.length) {
-      firstLine.skipReason = `Ya existía un fichaje para este día y proyecto (ID ${existingEntries
-        .map((entry) => entry.id)
-        .join(", ")}). Desmárcalo o crea una tarea aparte.`;
+      firstLine.skipReason =
+        "Este día ya está fichado en este proyecto (se muestra abajo). " +
+        "Marca la casilla si quieres añadir otra tarea igualmente.";
     }
     return {
       date,
       evidence,
       hasActivity,
       existing: existingEntries,
+      logged,
       warnings: [
         evidence?.warning,
         existingError ? `No se pudo comprobar si ya había fichajes (${existingError}).` : null
@@ -982,6 +998,55 @@ function renderWeekDay(day) {
 
   card.append(head, dayWarn);
 
+  if (day.logged?.length) {
+    const loggedBox = document.createElement("div");
+    loggedBox.className = "week-logged";
+    const loggedTitle = document.createElement("p");
+    loggedTitle.className = "week-logged-title";
+    loggedTitle.textContent = "Ya fichado en OpenProject";
+    loggedBox.append(loggedTitle);
+
+    for (const item of day.logged) {
+      const row = document.createElement("div");
+      row.className = "week-logged-item";
+
+      const meta = document.createElement("span");
+      meta.className = "week-logged-meta";
+      const packages = weekWorkPackages(item.projectId) || [];
+      const wp = item.workPackageId
+        ? packages.find((entry) => entry.id === String(item.workPackageId))
+        : null;
+      const taskLabel = item.workPackageId
+        ? wp
+          ? `#${wp.code || wp.id} · ${wp.subject}`
+          : `#${item.workPackageId}`
+        : "sin tarea";
+      const parts = [
+        weekProjectLabel(item.projectId || day.lines[0].opProjectId),
+        taskLabel,
+        timePart(item)
+      ].filter(Boolean);
+      meta.textContent = parts.join(" · ");
+
+      row.append(meta);
+
+      if (item.comment) {
+        const comment = document.createElement("p");
+        comment.className = "week-logged-comment";
+        comment.textContent = item.comment;
+        row.append(comment);
+      }
+
+      const idTag = document.createElement("span");
+      idTag.className = "week-logged-id";
+      idTag.textContent = `ID ${item.id}`;
+      row.append(idTag);
+
+      loggedBox.append(row);
+    }
+    card.append(loggedBox);
+  }
+
   if (day.evidence && !day.hasActivity && day.lines.length === 1 && !day.lines[0].textEdited) {
     const note = document.createElement("p");
     note.className = "hint";
@@ -1072,13 +1137,24 @@ async function runGenerate(dates, evidenceList, existingData, existingError) {
     evidenceByDate[evidence.date] = evidence;
   }
   const existingByDate = existingData?.byDate || existingData || {};
+  const allByDate = existingData?.allByDate || {};
 
-  buildDays(dates, evidenceByDate, existingByDate, existingError);
+  buildDays(dates, evidenceByDate, existingByDate, existingError, allByDate);
 
-  // Precarga las tareas del proyecto inicial de cada día.
-  const projectIds = [
-    ...new Set(state.weekly.days.map((day) => String(day.lines[0].opProjectId)).filter(Boolean))
-  ];
+  // Precarga las tareas del proyecto inicial de cada día y de los proyectos
+  // que aparecen en fichajes ya hechos, para poder mostrar su asunto.
+  const projectIds = new Set();
+  for (const day of state.weekly.days) {
+    const lineProject = String(day.lines[0].opProjectId || "");
+    if (lineProject) {
+      projectIds.add(lineProject);
+    }
+    for (const item of day.logged) {
+      if (item.projectId) {
+        projectIds.add(String(item.projectId));
+      }
+    }
+  }
   for (const projectId of projectIds) {
     try {
       await loadWeekWorkPackages(projectId);
@@ -1134,8 +1210,8 @@ async function generate() {
     // ni se envía al LLM.
     setStatus("Comprobando fichajes existentes en OpenProject...");
     const existing = await send({ type: "CHECK_EXISTING", date })
-      .then((data) => ({ byDate: { [date]: data.entries || [] } }))
-      .catch((error) => ({ byDate: {}, error: error.message }));
+      .then((data) => ({ byDate: { [date]: data.entries || [] }, allByDate: { [date]: data.allEntries || [] } }))
+      .catch((error) => ({ byDate: {}, allByDate: {}, error: error.message }));
 
     let evidenceList = [];
     if (!(existing.byDate[date] || []).length) {
@@ -1143,7 +1219,7 @@ async function generate() {
       evidenceList = [await send({ type: "FETCH_DAY", date })];
     }
 
-    await runGenerate([date], evidenceList, existing.byDate, existing.error);
+    await runGenerate([date], evidenceList, existing, existing.error);
     setStatus("Resumen listo. Revísalo, añade tareas si quieres dividir el día y pulsa Fichar.");
   } catch (error) {
     setStatus(error.message, "error");
@@ -1210,7 +1286,7 @@ async function generateWeek() {
       evidenceList = await send({ type: "FETCH_RANGE", dates: pendingDates });
     }
 
-    await runGenerate(dates, evidenceList, existing.byDate, existing.error);
+    await runGenerate(dates, evidenceList, existing, existing.error);
     setStatus("Resúmenes listos. Revisa cada día, divide tareas si quieres y pulsa Fichar.");
   } catch (error) {
     setStatus(error.message, "error");

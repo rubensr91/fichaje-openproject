@@ -2,6 +2,80 @@ export function pairKey(date, projectId) {
   return `${date}|${projectId}`;
 }
 
+export function durationToMinutes(value) {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?$/.exec(String(value || ""));
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const total = hours * 60 + minutes;
+  return total > 0 ? total : null;
+}
+
+// Rango visible de un fichaje existente: startTime es un instante UTC;
+// se muestra en la zona del navegador y el fin se deriva de la duración.
+export function loggedTimeRange(startTime, hours, timeZone) {
+  const date = new Date(String(startTime || ""));
+  if (!Number.isFinite(date.getTime())) {
+    return null;
+  }
+  const minutes = durationToMinutes(hours) ?? 0;
+  const end = new Date(date.getTime() + minutes * 60000);
+  const options = { hourCycle: "h23", hour: "2-digit", minute: "2-digit" };
+  if (timeZone) {
+    options.timeZone = timeZone;
+  }
+  const format = (value) => value.toLocaleTimeString("es-ES", options);
+  return { start: format(date), end: format(end) };
+}
+
+export function hrefMatchesProject(href, projectId) {
+  const value = String(href || "");
+  return value.endsWith(`/projects/${projectId}`) || value.includes(`/projects/${projectId}/`);
+}
+
+// Divide los entries en: por día para el proyecto objetivo (control de
+// duplicados) y por día para todos los proyectos (mostrar en la tarjeta).
+export function splitExisting(entries, targetProject) {
+  const byDate = {};
+  const allByDate = {};
+  for (const entry of entries) {
+    const date = String(entry?.spentOn || "").slice(0, 10);
+    if (!date) {
+      continue;
+    }
+    if (!allByDate[date]) {
+      allByDate[date] = [];
+    }
+    allByDate[date].push(entry);
+    if (!targetProject || hrefMatchesProject(entry?._links?.project?.href, targetProject)) {
+      if (!byDate[date]) {
+        byDate[date] = [];
+      }
+      byDate[date].push(entry);
+    }
+  }
+  return { byDate, allByDate };
+}
+
+// Extrae los campos visibles de un time entry de OpenProject (HAL).
+export function parseLoggedEntry(entry) {
+  const links = entry?._links || {};
+  const projectHref = String(links.project?.href || "");
+  const entityHref = String(links.entity?.href || "");
+  return {
+    id: entry?.id,
+    date: String(entry?.spentOn || "").slice(0, 10),
+    projectId: /\/projects\/(\d+)/.exec(projectHref)?.[1] || "",
+    workPackageId: /\/work_packages\/(\d+)/.exec(entityHref)?.[1] || "",
+    entityHref: entityHref,
+    hours: String(entry?.hours || ""),
+    startTime: String(entry?.startTime || ""),
+    comment: String(entry?.comment?.raw || "")
+  };
+}
+
 export function normalizeWorkPackageQuery(value) {
   return String(value || "").trim().toLowerCase().replace(/^#/, "");
 }

@@ -240,6 +240,7 @@ export async function getExistingEntriesForDates(config, dates, user, projectId 
     throw new Error("Faltan fechas para comprobar fichajes");
   }
   const targetProject = String(projectId || config.openprojectProjectId || "").trim();
+  const anyProject = targetProject === "*";
   const wanted = new Set(dates.map((date) => String(date)));
 
   const collected = new Map();
@@ -267,7 +268,7 @@ export async function getExistingEntriesForDates(config, dates, user, projectId 
         if (spentOn !== date) {
           continue;
         }
-        if (!projectHrefMatches(entry, targetProject)) {
+        if (!anyProject && !projectHrefMatches(entry, targetProject)) {
           continue;
         }
         collected.set(String(entry.id), entry);

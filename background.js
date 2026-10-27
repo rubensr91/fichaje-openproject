@@ -17,22 +17,7 @@ import {
   testOpenProject
 } from "./src/openproject.js";
 import { summarize } from "./src/llm.js";
-import { pairKey, planEntryActions } from "./src/weekly.js";
-
-function groupEntriesByDate(entries) {
-  const byDate = new Map();
-  for (const entry of entries) {
-    const date = String(entry.spentOn || "").slice(0, 10);
-    if (!date) {
-      continue;
-    }
-    if (!byDate.has(date)) {
-      byDate.set(date, []);
-    }
-    byDate.get(date).push(entry);
-  }
-  return byDate;
-}
+import { pairKey, planEntryActions, splitExisting } from "./src/weekly.js";
 
 function configureSidePanel() {
   if (chrome.sidePanel?.setPanelBehavior) {
@@ -119,29 +104,25 @@ async function handle(message) {
 
     case "CHECK_EXISTING": {
       const user = await getCurrentUser(config);
-      const entries = await getExistingEntries(
-        config,
-        message.date,
-        user,
-        message.projectId || ""
-      );
+      const target = String(message.projectId || config.openprojectProjectId || "");
+      const all = await getExistingEntriesForDates(config, [message.date], user, "*");
+      const split = splitExisting(all, target);
       return {
         user: { id: user.id, name: user.name || user.login },
-        entries
+        entries: split.byDate[message.date] || [],
+        allEntries: split.allByDate[message.date] || []
       };
     }
 
     case "CHECK_EXISTING_RANGE": {
       const user = await getCurrentUser(config);
-      const entries = await getExistingEntriesForDates(
-        config,
-        message.dates,
-        user,
-        message.projectId || ""
-      );
+      const target = String(message.projectId || config.openprojectProjectId || "");
+      const all = await getExistingEntriesForDates(config, message.dates, user, "*");
+      const split = splitExisting(all, target);
       return {
         user: { id: user.id, name: user.name || user.login },
-        byDate: Object.fromEntries(groupEntriesByDate(entries))
+        byDate: split.byDate,
+        allByDate: split.allByDate
       };
     }
 
