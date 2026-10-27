@@ -246,13 +246,14 @@ function eventProjectLabel(projectMeta, projectId) {
   return `[proyecto ${projectId}]`;
 }
 
-function itemFromEvent(event, projectLabel, user, kind) {
+function itemFromEvent(event, projectPath, user, kind) {
   const action = String(event.action_name || "").toLowerCase();
   const state = mapEventState(action);
   if (kind === "mr") {
     return {
       iid: event.target_iid,
-      title: `${projectLabel} ${event.target_title || "MR"}`,
+      title: cleanTitle(event.target_title || "MR"),
+      project: projectPath,
       description: "",
       state,
       created_at: event.created_at,
@@ -263,7 +264,8 @@ function itemFromEvent(event, projectLabel, user, kind) {
   if (kind === "issue") {
     return {
       iid: event.target_iid,
-      title: `${projectLabel} ${event.target_title || "Issue"}`,
+      title: cleanTitle(event.target_title || "Issue"),
+      project: projectPath,
       description: "",
       state,
       created_at: event.created_at,
@@ -273,7 +275,8 @@ function itemFromEvent(event, projectLabel, user, kind) {
   }
   if (kind === "comment") {
     return {
-      title: `${projectLabel} comentario: ${event.target_title || ""}`.trim(),
+      title: `comentario: ${cleanTitle(event.target_title || "")}`.trim(),
+      project: projectPath,
       message: "",
       author_name: user.name,
       author_email: user.email || "",
@@ -285,7 +288,8 @@ function itemFromEvent(event, projectLabel, user, kind) {
   const pushData = event.push_data || {};
   const title = pushData.commit_title || event.target_title || "push";
   return {
-    title: `${projectLabel} ${title}`,
+    title: cleanTitle(title),
+    project: projectPath,
     message: `${title} | push de ${pushData.commit_count || 1} commit(s) a ${pushData.ref || "?"}`,
     author_name: user.name,
     author_email: user.email || "",
@@ -293,6 +297,20 @@ function itemFromEvent(event, projectLabel, user, kind) {
     web_url: "",
     stats: null
   };
+}
+
+function cleanTitle(value) {
+  return String(value || "")
+    .replace(/^\[[^\]]+\]\s*/, "")
+    .trim();
+}
+
+function projectPathOf(projectMeta, projectId) {
+  const project = projectMeta.get(projectId);
+  if (!project) {
+    return `proyecto ${projectId}`;
+  }
+  return project.path_with_namespace || project.name || `proyecto ${projectId}`;
 }
 
 export async function fetchRangeAll(config, dates) {
@@ -347,93 +365,113 @@ export async function fetchRangeAll(config, dates) {
   // 3. Detalle completo por proyecto y día; eventos como respaldo.
   return Promise.all(
     dates.map(async (date) => {
-    const commits = [];
-    const mergeRequests = new Map();
-    const issues = new Map();
-    const dayEvents = eventsByDay.get(date) || [];
-    const warnings = [];
+      const commits = [];
+      const mergeRequests = new Map();
+      const issues = new Map();
+      const projects = [];
+      const dayEvents = eventsByDay.get(date) || [];
+      const warnings = [];
 
-    for (const projectId of activityProjectsByDay.get(date) || []) {
-      const project = projectMeta.get(projectId);
-      const projectLabel = eventProjectLabel(projectMeta, projectId);
-      let detailedOk = false;
+      const addProject = (path) => {
+        if (path && !projects.includes(path)) {
+          projects.push(path);
+        }
+      };
 
-      if (project) {
-        try {
-          const detailed = await fetchDayActivity(config, date, user, project);
-          commits.push(...detailed.commits);
-          for (const mr of detailed.mergeRequests) {
-            mergeRequests.set(mr.iid, mr);
+      for (const projectId of activityProjectsByDay.get(date) || []) {
+        const project = projectMeta.get(projectId);
+        const projectPath = projectPathOf(projectMeta, projectId);
+        let detailedOk = false;
+
+        if (project) {
+          try {
+            const detailed = await fetchDayActivity(config, date, user, project);
+            for (const commit of detailed.commits) {
+              commit.project = commit.project || projectPath;
+              commits.push(commit);
+              addProject(commit.project);
+            }
+            for (const mr of detailed.mergeRequests) {
+              mr.project = mr.project || projectPath;
+              mergeRequests.set(mr.iid, mr);
+              addProject(mr.project);
+            }
+            for (const issue of detailed.issues) {
+              issue.project = issue.project || projectPath;
+              issues.set(issue.iid, issue);
+              addProject(issue.project);
+            }
+            detailedOk = true;
+            if (detailed.warning) {
+              warnings.push(`${projectPath}: ${detailed.warning}`);
+            }
+          } catch (error) {
+            warnings.push(
+              `Detalle de ${projectPath} no disponible (${error.message}); se usaron solo los eventos.`
+            );
           }
-          for (const issue of detailed.issues) {
-            issues.set(issue.iid, issue);
-          }
-          detailedOk = true;
-          if (detailed.warning) {
-            warnings.push(`${project.path_with_namespace}: ${detailed.warning}`);
-          }
-        } catch (error) {
+        } else {
           warnings.push(
-            `Detalle de ${project.path_with_namespace} no disponible (${error.message}); se usaron solo los eventos.`
+            `No se pudo leer el detalle del proyecto ${projectId}; se usaron solo los eventos.`
           );
         }
-      } else {
-        warnings.push(
-          `No se pudo leer el detalle del proyecto ${projectId}; se usaron solo los eventos.`
-        );
-      }
 
-      // Añade lo que los eventos ven y el detalle puede no recoger:
-      // pushes si falló el detalle, y MRs/issues cerradas o fusionadas por ti
-      // pero creadas por otra persona (el filtro por autor no las ve).
-      for (const event of dayEvents) {
-        if (event.project_id !== projectId) {
-          continue;
+        // Añade lo que los eventos ven y el detalle puede no recoger:
+        // pushes si falló el detalle, y MRs/issues cerradas o fusionadas por ti
+        // pero creadas por otra persona (el filtro por autor no las ve).
+        for (const event of dayEvents) {
+          if (event.project_id !== projectId) {
+            continue;
+          }
+          const action = String(event.action_name || "").toLowerCase();
+          if ((action === "pushed to" || action === "pushed new") && !detailedOk) {
+            commits.push(itemFromEvent(event, projectPath, user, "push"));
+            addProject(projectPath);
+          } else if (event.target_type === "MergeRequest" && !mergeRequests.has(event.target_iid)) {
+            mergeRequests.set(event.target_iid, itemFromEvent(event, projectPath, user, "mr"));
+            addProject(projectPath);
+          } else if (event.target_type === "Issue" && !issues.has(event.target_iid)) {
+            issues.set(event.target_iid, itemFromEvent(event, projectPath, user, "issue"));
+            addProject(projectPath);
+          }
         }
-        const action = String(event.action_name || "").toLowerCase();
-        if ((action === "pushed to" || action === "pushed new") && !detailedOk) {
-          commits.push(itemFromEvent(event, projectLabel, user, "push"));
-        } else if (event.target_type === "MergeRequest" && !mergeRequests.has(event.target_iid)) {
-          mergeRequests.set(event.target_iid, itemFromEvent(event, projectLabel, user, "mr"));
-        } else if (event.target_type === "Issue" && !issues.has(event.target_iid)) {
-          issues.set(event.target_iid, itemFromEvent(event, projectLabel, user, "issue"));
+      }
+
+      // Comentarios: solo existen como eventos.
+      for (const event of commentsByDay.get(date) || []) {
+        const projectPath = projectPathOf(projectMeta, event.project_id);
+        commits.push(itemFromEvent(event, projectPath, user, "comment"));
+        addProject(projectPath);
+      }
+
+      const mergeRequestsList = [...mergeRequests.values()];
+      const issuesList = [...issues.values()];
+      const warning = [...new Set(warnings)].filter(Boolean).join(" ") || null;
+
+      return {
+        date,
+        gitlabUser: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email || ""
+        },
+        project: {
+          id: null,
+          name: projects[0] || "",
+          path: projects[0] || "",
+          webUrl: ""
+        },
+        projects,
+        commits,
+        mergeRequests: mergeRequestsList,
+        issues: issuesList,
+        warning,
+        counts: {
+          commits: commits.length,
+          mergeRequests: mergeRequestsList.length,
+          issues: issuesList.length
         }
-      }
-    }
-
-    // Comentarios: solo existen como eventos.
-    for (const event of commentsByDay.get(date) || []) {
-      const projectLabel = eventProjectLabel(projectMeta, event.project_id);
-      commits.push(itemFromEvent(event, projectLabel, user, "comment"));
-    }
-
-    const mergeRequestsList = [...mergeRequests.values()];
-    const issuesList = [...issues.values()];
-    const warning = [...new Set(warnings)].filter(Boolean).join(" ") || null;
-
-    return {
-      date,
-      gitlabUser: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        email: user.email || ""
-      },
-      project: {
-        id: null,
-        name: "Todas las contribuciones",
-        path: "Todas las contribuciones",
-        webUrl: ""
-      },
-      commits,
-      mergeRequests: mergeRequestsList,
-      issues: issuesList,
-      warning,
-      counts: {
-        commits: commits.length,
-        mergeRequests: mergeRequestsList.length,
-        issues: issuesList.length
-      }
       };
     })
   );

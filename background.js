@@ -17,6 +17,7 @@ import {
   testOpenProject
 } from "./src/openproject.js";
 import { summarize } from "./src/llm.js";
+import { pairKey, planEntryActions } from "./src/weekly.js";
 
 function groupEntriesByDate(entries) {
   const byDate = new Map();
@@ -118,7 +119,12 @@ async function handle(message) {
 
     case "CHECK_EXISTING": {
       const user = await getCurrentUser(config);
-      const entries = await getExistingEntries(config, message.date, user);
+      const entries = await getExistingEntries(
+        config,
+        message.date,
+        user,
+        message.projectId || ""
+      );
       return {
         user: { id: user.id, name: user.name || user.login },
         entries
@@ -127,7 +133,12 @@ async function handle(message) {
 
     case "CHECK_EXISTING_RANGE": {
       const user = await getCurrentUser(config);
-      const entries = await getExistingEntriesForDates(config, message.dates, user);
+      const entries = await getExistingEntriesForDates(
+        config,
+        message.dates,
+        user,
+        message.projectId || ""
+      );
       return {
         user: { id: user.id, name: user.name || user.login },
         byDate: Object.fromEntries(groupEntriesByDate(entries))
@@ -137,18 +148,28 @@ async function handle(message) {
     case "CREATE_ENTRIES": {
       const user = await getCurrentUser(config);
       const defaultProject = String(config.openprojectProjectId || "");
+      const items = message.entries.map((item) => ({
+        ...item,
+        projectId: String(item.projectId || defaultProject)
+      }));
 
-      // Duplicados: mismo día y mismo proyecto (el proyecto puede variar por ítem).
-      const projectIds = [
-        ...new Set(message.entries.map((item) => String(item.projectId || defaultProject)))
-      ];
-      const existingByProject = new Map();
+      // Duplicados: por par (día, proyecto), con política consumir-una.
+      const projectIds = [...new Set(items.map((item) => item.projectId))];
+      const existingIdsByPair = new Map();
       for (const projectId of projectIds) {
-        const dates = message.entries
-          .filter((item) => String(item.projectId || defaultProject) === projectId)
-          .map((item) => item.date);
+        const dates = [
+          ...new Set(
+            items.filter((item) => item.projectId === projectId).map((item) => item.date)
+          )
+        ];
         const existing = await getExistingEntriesForDates(config, dates, user, projectId);
-        existingByProject.set(projectId, groupEntriesByDate(existing));
+        for (const entry of existing) {
+          const key = pairKey(String(entry.spentOn || "").slice(0, 10), projectId);
+          if (!existingIdsByPair.has(key)) {
+            existingIdsByPair.set(key, []);
+          }
+          existingIdsByPair.get(key).push(entry.id);
+        }
       }
 
       const activity = await detectActivity(
@@ -156,18 +177,10 @@ async function handle(message) {
         config.openprojectActivityName || "Development"
       );
 
-      const results = { created: [], skipped: [], failed: [] };
-      for (const item of message.entries) {
-        const projectId = String(item.projectId || defaultProject);
-        const byDate = existingByProject.get(projectId);
-        const already = byDate?.get(item.date) || [];
-        if (already.length) {
-          results.skipped.push({
-            date: item.date,
-            reason: `Ya existía un fichaje (ID ${already.map((entry) => entry.id).join(", ")})`
-          });
-          continue;
-        }
+      const plan = planEntryActions(items, existingIdsByPair);
+      const results = { created: [], skipped: [...plan.skipped], failed: [] };
+
+      for (const item of plan.toCreate) {
         try {
           const entry = await createTimeEntry(config, {
             date: item.date,
@@ -175,19 +188,17 @@ async function handle(message) {
             end: item.end,
             comment: item.comment,
             workPackageId: item.workPackageId,
-            projectId,
+            projectId: item.projectId,
             activity
           });
           results.created.push({
+            lineId: item.lineId,
             date: item.date,
             id: entry.id,
             hours: entry.hours || null
           });
-          if (byDate) {
-            byDate.set(item.date, [entry]);
-          }
         } catch (error) {
-          results.failed.push({ date: item.date, error: error.message });
+          results.failed.push({ lineId: item.lineId, date: item.date, error: error.message });
         }
       }
       return results;

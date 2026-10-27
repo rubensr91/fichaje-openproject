@@ -231,8 +231,8 @@ function projectHrefMatches(entry, projectId) {
   return href.endsWith(`/projects/${projectId}`) || href.includes(`/projects/${projectId}/`);
 }
 
-export async function getExistingEntries(config, date, user) {
-  return getExistingEntriesForDates(config, [date], user);
+export async function getExistingEntries(config, date, user, projectId = "") {
+  return getExistingEntriesForDates(config, [date], user, projectId);
 }
 
 export async function getExistingEntriesForDates(config, dates, user, projectId = "") {

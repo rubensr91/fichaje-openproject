@@ -142,14 +142,15 @@ main {
 .week-day {
   display: grid;
   gap: 6px;
-  padding: 10px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
   border-radius: 8px;
   background: var(--surface-2);
 }
 
 .week-day + .week-day {
-  margin-top: 8px;
+  margin-top: 14px;
 }
 
 .week-day-head {
@@ -205,6 +206,58 @@ main {
   padding: 7px 8px;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.week-line {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--line);
+}
+
+.week-line + .week-line {
+  border-top: 1px dashed var(--line);
+}
+
+.week-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.week-line-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.week-line-check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.week-line.done {
+  opacity: 0.75;
+}
+
+.week-line.error {
+  border-left: 3px solid var(--danger);
+  padding-left: 8px;
+}
+
+.week-line-remove {
+  margin-left: auto;
+}
+
+.week-line-targets {
+  display: grid;
+  gap: 8px;
 }
 
 .week-day .field > span {

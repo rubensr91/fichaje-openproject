@@ -34,6 +34,7 @@ export function normalizeEvidence(evidence = {}) {
       title: truncate(commit.title || commit.message, 180),
       message: truncate(commit.message, 400),
       author: clean(commit.author_name),
+      project: clean(commit.project),
       url: commit.web_url || ""
     })),
     mergeRequests: mergeRequests.map((mr) => ({
@@ -41,6 +42,7 @@ export function normalizeEvidence(evidence = {}) {
       title: truncate(mr.title, 180),
       description: truncate(mr.description, 400),
       state: clean(mr.state),
+      project: clean(mr.project),
       url: mr.web_url || ""
     })),
     issues: issues.map((issue) => ({
@@ -48,6 +50,7 @@ export function normalizeEvidence(evidence = {}) {
       title: truncate(issue.title, 180),
       description: truncate(issue.description, 300),
       state: clean(issue.state),
+      project: clean(issue.project),
       url: issue.web_url || ""
     }))
   };
@@ -104,21 +107,28 @@ export function buildEvidenceText(evidence, date, projectName) {
   if (data.commits.length) {
     lines.push("", "Commits:");
     for (const commit of data.commits) {
-      lines.push(`- ${commit.title}${commit.message && commit.message !== commit.title ? ` | ${commit.message}` : ""}`);
+      const prefix = commit.project ? `[${commit.project}] ` : "";
+      lines.push(
+        `- ${prefix}${commit.title}${
+          commit.message && commit.message !== commit.title ? ` | ${commit.message}` : ""
+        }`
+      );
     }
   }
 
   if (data.mergeRequests.length) {
     lines.push("", "Merge requests:");
     for (const mr of data.mergeRequests) {
-      lines.push(`- !${mr.iid} ${mr.title} [${mr.state}]${mr.description ? ` | ${mr.description}` : ""}`);
+      const prefix = mr.project ? `[${mr.project}] ` : "";
+      lines.push(`- ${prefix}!${mr.iid} ${mr.title} [${mr.state}]${mr.description ? ` | ${mr.description}` : ""}`);
     }
   }
 
   if (data.issues.length) {
     lines.push("", "Issues:");
     for (const issue of data.issues) {
-      lines.push(`- #${issue.iid} ${issue.title} [${issue.state}]${issue.description ? ` | ${issue.description}` : ""}`);
+      const prefix = issue.project ? `[${issue.project}] ` : "";
+      lines.push(`- ${prefix}#${issue.iid} ${issue.title} [${issue.state}]${issue.description ? ` | ${issue.description}` : ""}`);
     }
   }
 
@@ -136,7 +146,8 @@ export function buildLlmMessagesFromText(evidenceText) {
         "resumen entre días distintos, no menciones horas y no des consejos. " +
         "Si los datos contienen actividad de varios proyectos (cada elemento va marcado como [proyecto]), " +
         "agrupa el resumen por proyecto con un apartado por proyecto en el mismo orden en que aparecen. " +
-        "Si solo hay un proyecto, resume como de costumbre. " +
+        "Si solo hay un proyecto, resume como de costumbre pero menciona el nombre del proyecto de GitLab " +
+        "en el resumen. " +
         "Si el día no tiene ningún elemento, responde exactamente: Sin actividad registrada en GitLab para este día. " +
         "Devuelve solo el texto del resumen, en 2 a 6 líneas, con viñetas si ayuda. Sé concreto y técnico."
     },

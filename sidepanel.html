@@ -123,27 +123,12 @@
 
       <section id="weeklySection" class="card hidden">
         <div class="section-head">
-          <h2>Resumen por día</h2>
+          <h2 id="weeklyTitle">Resumen por día</h2>
           <span id="weeklyProgress" class="hint"></span>
         </div>
         <div id="weeklyDays"></div>
       </section>
 
-      <section id="summarySection" class="card hidden">
-        <div class="section-head">
-          <h2>Resumen</h2>
-          <span id="summarySource" class="badge hidden"></span>
-        </div>
-        <textarea
-          id="summary"
-          rows="7"
-          placeholder="El resumen aparecerá aquí. Puedes editarlo antes de fichar."
-        ></textarea>
-        <p id="evidenceHint" class="hint"></p>
-        <p id="summaryWarning" class="notice warn hidden"></p>
-      </section>
-
-      <section id="existingBox" class="notice warn hidden" aria-live="polite"></section>
       <section id="statusBox" class="status hidden" aria-live="polite"></section>
 
       <section id="settingsPanel" class="card settings hidden">

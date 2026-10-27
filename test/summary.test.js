@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildEvidenceText,
   buildLlmMessages,
   fallbackSummary,
   normalizeEvidence
@@ -44,6 +45,27 @@ test("construye mensajes para el LLM con fecha y proyecto", () => {
   assert.equal(messages[1].role, "user");
   assert.match(messages[1].content, /2026-10-26/);
   assert.match(messages[1].content, /demo\/project/);
+});
+
+test("el texto de evidencia marca el proyecto en cada item cuando existe", () => {
+  const text = buildEvidenceText(
+    {
+      commits: [
+        { title: "feat: login", message: "feat: login", project: "grupo/web" },
+        { title: "feat: endpoint", message: "", project: "grupo/api" }
+      ],
+      mergeRequests: [{ iid: 5, title: "Notificaciones", state: "merged", project: "grupo/web" }],
+      issues: []
+    },
+    "2026-10-26",
+    "grupo/web, grupo/api"
+  );
+  assert.match(text, /Fecha: 2026-10-26/);
+  assert.match(text, /Proyecto: grupo\/web, grupo\/api/);
+  assert.match(text, /- \[grupo\/web\] feat: login/);
+  assert.match(text, /- \[grupo\/api\] feat: endpoint/);
+  assert.match(text, /- \[grupo\/web\] !5 Notificaciones \[merged\]/);
+  assert.ok(!text.includes("Todas las contribuciones"));
 });
 
 test("el resumen local agrupa por proyecto los títulos marcados", () => {

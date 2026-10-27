@@ -55,6 +55,7 @@ background.js
         +-- src/openproject.js
         +-- src/llm.js
         +-- src/redact.js
+        +-- src/weekly.js
         +-- src/summary.js
         +-- src/time.js
         +-- src/http.js
@@ -80,15 +81,16 @@ background.js
 - Token con `read_api` o `api`. `read_user` solo no sirve.
 - `isConfigured` solo exige `gitlabProject` en modo `project`.
 
-### Modo rango (varios días)
+### Líneas de fichaje y modo rango (varios días)
 
 - Mensajes nuevos en `background.js`: `FETCH_RANGE`, `CHECK_EXISTING_RANGE`, `CREATE_ENTRIES`.
-- `CHECK_EXISTING_RANGE` agrupa fichajes por día con `spent_on =d` multi-fecha (`getExistingEntriesForDates`).
-- `CREATE_ENTRIES` comprueba duplicados por día y por proyecto (cada ítem admite `projectId` y `workPackageId` propios; si faltan, usan la config), detecta la actividad una vez y crea día a día, saltando los que ya tienen fichaje. Devuelve `created`/`skipped`/`failed`.
-- El panel muestra una tarjeta por día con resumen editable, casilla de inclusión, tramo horario propio y selector de tarea; los días sin actividad quedan desmarcados.
-- Cada día del rango puede tener su propio tramo horario (inicio/fin en la tarjeta). El tramo global solo inicializa los días no editados (`propagateGlobalHours`). Un tramo invertido invalida ese día y no se ficha.
-- Cada día puede tener su propio proyecto (`day.opProjectId`, selector en la tarjeta). Las tareas se cargan por proyecto con caché (`loadWeekWorkPackages` / `wpCache`); cambiar el proyecto de un día limpia su tarea y su estado de duplicado. Los cambios en el selector global de proyecto se propagan a los días no editados (`propagateGlobalProject`). Un día sin proyecto queda descartado.
-- Cada día también puede tener su propio work package (`day.wpId` con `<select>` por tarjeta). El work package global solo inicializa los días no editados (`propagateGlobalWorkPackage`). Un día sin `wpId` queda descartado.
+- `CHECK_EXISTING_RANGE` agrupa fichajes por día con `spent_on =d` multi-fecha (`getExistingEntriesForDates`). El mensaje acepta `projectId` opcional.
+- `CREATE_ENTRIES` recibe `{ lineId, date, start, end, projectId, workPackageId, comment, allowExisting }`. Detecta la actividad una vez. La política de duplicados vive en `src/weekly.js::planEntryActions` (consumir-una: los existentes del par (día, proyecto) se asignan a las primeras líneas no-`allowExisting`; el resto se crea). Devuelve `created`/`skipped`/`failed` con `lineId`.
+- El panel comparte motor para Diario y Rango: `state.weekly.days[]` con `lines[]`. Cada línea tiene casilla, tramo, proyecto, tarea y resumen propios. Botón **+ Añadir tarea** por tarjeta (siempre activo); el resumen del LLM rellena la primera línea (casilla «Fichar este día»; extras «Fichar esta tarea»).
+- En modo eventos (`fetchRangeAll`), cada item lleva `project` (`grupo/proyecto`) y el día expone `projects[]`. `buildEvidenceText` prefija los items con `[project]`; el `projectName` que envía el panel es la lista `projects.join(", ")`. No debe aparecer la etiqueta «Todas las contribuciones» en los resúmenes.
+- `src/weekly.js` tiene helpers puros testeables: `pairKey`, `planEntryActions`, `filterWorkPackages`, `autoSelectWorkPackage`.
+- En cada línea, proyecto y tarea ocupan **filas separadas** (`.week-line-targets`). La tarea incluye **buscador**: filtra por código/asunto/estado/tipo (`filterWorkPackages`) y **autoselecciona** si el texto coincide exactamente con el código o el asunto (`autoSelectWorkPackage`). El buscador no repinta la tarjeta: rellena el `<select>` in-place (`fillTaskSelect`).
+- El tramo/proyecto/tarea globales solo inicializan las líneas no editadas (`propagateGlobalHours`, `propagateGlobalProject`, `propagateGlobalWorkPackage`). Un tramo invertido, una línea sin proyecto o sin tarea invalidan solo esa línea.
 
 ### Resumen
 
@@ -170,7 +172,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **44/44 tests pasan**.
+Estado verificado: **51/51 tests pasan**.
 
 ## Estado actual y deuda técnica
 

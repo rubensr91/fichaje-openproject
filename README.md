@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.19`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.24`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -100,6 +100,20 @@ El filtro reduce el riesgo, pero **no garantiza** detectar cualquier secreto. Un
 
 El tramo se puede cambiar antes de generar el resumen.
 
+### Líneas dentro de un día
+
+Tanto en **Diario** como en **Rango**, cada día es una tarjeta que puede dividirse en **varias líneas de fichaje**. Pulsa **+ Añadir tarea** para crear otra entrada en el mismo día. Cada línea tiene:
+
+- su **tramo horario** (inicio y fin propios);
+- su **proyecto de OpenProject** y su **tarea** (work package);
+- su **campo de texto** para el resumen.
+
+El resumen generado por el LLM rellena la **primera línea**; las demás empiezan vacías para que copies, pegues o escribas tú mismo. El botón **+ Añadir tarea** está siempre disponible. La casilla de la primera línea dice **Fichar este día**; las líneas añadidas dicen **Fichar esta tarea**.
+
+En el modo «Todas las contribuciones», cada commit, MR o issue viaja con su **proyecto de GitLab** (campo `project` en la evidencia y prefijo `[grupo/proyecto]` en el texto que recibe el LLM), así que el resumen siempre indica en qué proyecto se trabajó ese día. La etiqueta genérica «Todas las contribuciones» ya no aparece en los resúmenes.
+
+Política de duplicados (consumir existentes): si OpenProject ya tiene un fichaje para ese día y proyecto, la primera línea de ese par aparece marcada como existente y se omite al fichar. Las líneas **añadidas a propósito** se crean aunque exista un fichaje previo en el mismo proyecto y día — úsalo para repartir horas entre varias tareas del mismo proyecto.
+
 ### Modo rango (varios días)
 
 Además del modo diario, la extensión tiene un modo **Rango**:
@@ -113,26 +127,27 @@ Además del modo diario, la extensión tiene un modo **Rango**:
 
 Detalles:
 
-- Cada tarjeta tiene sus propios campos de inicio y fin, su selector de **proyecto de OpenProject** y su selector de **tarea** (work package). Las tareas de la tarjeta se cargan según el proyecto elegido en esa tarjeta. El tramo global, el proyecto global y la tarea global actúan solo como valor inicial; si los cambias después, se propagarán a los días que no hayas editado a mano.
+- Cada línea tiene su **tramo horario** (inicio y fin), su **proyecto de OpenProject** y su **tarea** (work package), cada uno en su propia fila. Bajo el selector de tarea hay un **buscador**: filtra por código, asunto, estado o tipo, y si el texto coincide exactamente con el código (`1234` o `#1234`) o el nombre de la tarea, la **autoselecciona**. El tramo global, el proyecto global y la tarea global actúan solo como valor inicial; si los cambias después, se propagarán a las líneas que no hayas editado a mano.
+- Puedes **dividir el día en varias líneas** con **+ Añadir tarea**: cada una con su tramo, proyecto, tarea y resumen. Ver [Líneas dentro de un día](#líneas-dentro-de-un-día).
 - Los días sin actividad en GitLab quedan **desmarcados** por defecto (con su texto local); puedes marcarlos y editar el texto a mano.
-- Los días que ya tienen un fichaje en ese proyecto aparecen como **Ya fichado** y se omiten automáticamente.
-- Un tramo invertido (fin ≤ inicio) o un día sin tarea seleccionada invalida ese día y no se ficha; el aviso aparece en la tarjeta.
-- Si algún día falla al crear, el resto sigue; el error se muestra en su tarjeta y puedes volver a intentarlo.
+- Los días que ya tienen un fichaje en ese proyecto muestran la primera línea como **existente** y se omite al fichar; las líneas añadidas a propósito sí se crean.
+- Un tramo invertido (fin ≤ inicio) o una línea sin tarea seleccionada invalida esa línea y no se ficha; el aviso aparece en la tarjeta.
+- Si alguna línea falla al crear, el resto sigue; el error se muestra en su tarjeta y puedes volver a intentarla.
 
 ## Uso
 
 1. Elige el modo: diario o rango.
 2. Elige el día (o el rango de días).
-3. Ajusta inicio y fin (en modo rango puedes ajustarlos por día).
+3. Ajusta inicio y fin (luego puedes ajustarlos por día o por línea).
 4. Elige el proyecto de OpenProject y el work package.
 5. Pulsa **Generar resumen** (o **Generar resúmenes**).
-6. Revisa y edita el texto.
+6. Revisa y edita el texto. Si quieres dividir el día en varias tareas, pulsa **+ Añadir tarea** y rellena tramo, proyecto, tarea y resumen de cada línea.
 7. Pulsa **Fichar**.
 8. Confirma.
 
 Los proyectos salen de `GET /api/v3/time_entries/available_projects`, es decir, solo aquellos en los que puedes fichar. Los work packages se cargan al elegir proyecto y se filtran por permiso de fichaje. En el desplegable aparecen como `#1234 · Tarea de ejemplo [In progress]`. El campo **Buscar tarea** filtra por código, asunto, estado o tipo.
 
-La app comprueba si ya existe un fichaje para ese día y proyecto antes de crear otro.
+La app comprueba si ya existe un fichaje para ese día y proyecto antes de crear otro. Con varias líneas en el mismo día, el primer fichaje previo de cada par (día, proyecto) se consume: las líneas extra que añadas a propósito sí se crean.
 
 ## OpenProject: horas de inicio
 
@@ -185,8 +200,8 @@ En **Ajustes → Seguridad de tokens**:
 ## Limitaciones actuales
 
 - Una sola instancia GitLab por configuración (el modo «Todas las contribuciones» lee todos sus proyectos).
-- Varios proyectos OpenProject; cada fichaje (día) apunta a uno de ellos.
-- En modo rango, el proyecto, la tarea y el tramo horario son configurables por día (los selectores globales inicializan los días que no hayas tocado).
+- Varios proyectos OpenProject; cada línea de fichaje (día + tramo) apunta a uno de ellos.
+- En modo rango, el proyecto, la tarea y el tramo horario son configurables por línea (los selectores globales inicializan las líneas que no hayas tocado).
 - La actividad está fijada a `Development`.
 - La detección de autoría de commits puede requerir configurar `Autor GitLab`.
 - No hay tests de integración contra GitLab/OpenProject.

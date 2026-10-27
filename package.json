@@ -1,6 +1,6 @@
 {
   "name": "fichaje-extension",
-  "version": "0.1.19",
+  "version": "0.1.24",
   "description": "Extensión de navegador para resumir actividad de GitLab y fichar en OpenProject",
   "private": true,
   "license": "MIT",

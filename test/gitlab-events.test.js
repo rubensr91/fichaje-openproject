@@ -127,8 +127,21 @@ test("enriquece los eventos con el detalle completo por proyecto", async () => {
     assert.ok(day.commits.some((commit) => commit.title.includes("comentario: Revisado en reunión")));
     assert.ok(day.commits.every((commit) => !commit.title.includes("ultimo commit")));
 
-    // MR del respaldo de eventos, con prefijo de proyecto.
-    assert.equal(day.mergeRequests[0].title, "[grupo/web] Notificaciones");
+    // Proyecto estructural en cada item, sin prefijos en el título.
+    assert.deepEqual(day.projects, ["grupo/web", "grupo/api"]);
+    assert.equal(day.project.path, "grupo/web");
+    assert.equal(
+      day.commits.find((commit) => commit.title === "feat: login").project,
+      "grupo/web"
+    );
+    assert.equal(
+      day.commits.find((commit) => commit.title === "feat: endpoint").project,
+      "grupo/api"
+    );
+
+    // MR del respaldo de eventos: título limpio + campo project.
+    assert.equal(day.mergeRequests[0].title, "Notificaciones");
+    assert.equal(day.mergeRequests[0].project, "grupo/web");
     assert.equal(day.mergeRequests[0].description, "");
 
     // Issue con estado real.
@@ -157,9 +170,11 @@ test("si falla el detalle de un proyecto, usa los eventos como respaldo", async 
   try {
     const day = await fetchDayAll(config, "2026-10-26");
 
-    // Respaldo: el push del evento entra como item.
+    // Respaldo: el push del evento entra como item con su proyecto.
     assert.equal(day.counts.commits, 1);
-    assert.match(day.commits[0].title, /\[grupo\/web\] feat: ultimo commit/);
+    assert.equal(day.commits[0].title, "feat: ultimo commit");
+    assert.equal(day.commits[0].project, "grupo/web");
+    assert.deepEqual(day.projects, ["grupo/web"]);
     assert.match(day.warning, /no disponible/);
   } finally {
     mock.restore();
