@@ -4,7 +4,7 @@ export const DEFAULT_CONFIG = {
   gitlabBaseUrl: "",
   gitlabProject: "",
   gitlabAuthor: "",
-  gitlabMode: "project",
+  gitlabMode: "all",
   openprojectBaseUrl: "",
   openprojectProjectId: "",
   openprojectWorkPackageId: "",
@@ -45,7 +45,7 @@ export async function saveConfig(patch) {
 }
 
 export function isConfigured(config) {
-  const needsGitlabProject = (config.gitlabMode || "project") !== "all";
+  const needsGitlabProject = (config.gitlabMode || "all") !== "all";
   return Boolean(
     config.gitlabBaseUrl &&
       (!needsGitlabProject || config.gitlabProject) &&

@@ -271,7 +271,7 @@ function resetResult() {
 
 function populateSettings(config) {
   $("gitlabBaseUrl").value = config.gitlabBaseUrl;
-  $("gitlabMode").value = config.gitlabMode || "project";
+  $("gitlabMode").value = config.gitlabMode || "all";
   $("gitlabProject").value = config.gitlabProject;
   $("gitlabAuthor").value = config.gitlabAuthor;
 
@@ -364,7 +364,7 @@ function readSettings() {
     gitlabBaseUrl: $("gitlabBaseUrl").value.trim(),
     gitlabProject: $("gitlabProject").value.trim(),
     gitlabAuthor: $("gitlabAuthor").value.trim(),
-    gitlabMode: $("gitlabMode").value || "project",
+    gitlabMode: $("gitlabMode").value || "all",
     openprojectBaseUrl: $("openprojectBaseUrl").value.trim(),
     openprojectProjectId: $("openprojectProjectId").value.trim(),
     openprojectWorkPackageId: $("openprojectWorkPackageId").value.trim(),
@@ -843,6 +843,18 @@ async function generate() {
   if (state.busy) {
     return;
   }
+  if (!secretsUsable()) {
+    setStatus("Desbloquea la caja de tokens o configura los tokens en ajustes.", "error");
+    $("settingsPanel").classList.remove("hidden");
+    return;
+  }
+  if (!isConfigured(state.config || {})) {
+    setStatus("Completa y guarda los ajustes antes de continuar.", "error");
+    $("settingsPanel").classList.remove("hidden");
+    return;
+  }
+
+  const hours = currentRange();
   if (hours === null) {
     setStatus("Revisa el tramo horario.", "error");
     return;

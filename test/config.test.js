@@ -22,3 +22,31 @@ test("la configuración base no exige tokens en el objeto no secreto", () => {
     true
   );
 });
+
+test("el modo por defecto es todas las contribuciones", () => {
+  assert.equal(DEFAULT_CONFIG.gitlabMode, "all");
+  assert.equal(
+    isConfigured({
+      gitlabBaseUrl: "https://gitlab.example.test",
+      gitlabProject: "",
+      openprojectBaseUrl: "https://openproject.example.test",
+      openprojectProjectId: "101",
+      openprojectWorkPackageId: "201"
+    }),
+    true
+  );
+});
+
+test("el modo proyecto exige el proyecto de GitLab", () => {
+  assert.equal(
+    isConfigured({
+      gitlabBaseUrl: "https://gitlab.example.test",
+      gitlabMode: "project",
+      gitlabProject: "",
+      openprojectBaseUrl: "https://openproject.example.test",
+      openprojectProjectId: "101",
+      openprojectWorkPackageId: "201"
+    }),
+    false
+  );
+});

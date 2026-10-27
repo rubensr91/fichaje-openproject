@@ -92,14 +92,14 @@ async function handle(message) {
     }
 
     case "FETCH_DAY": {
-      if ((config.gitlabMode || "project") === "all") {
+      if ((config.gitlabMode || "all") === "all") {
         return fetchDayAll(config, message.date);
       }
       return fetchDay(config, message.date);
     }
 
     case "FETCH_RANGE": {
-      if ((config.gitlabMode || "project") === "all") {
+      if ((config.gitlabMode || "all") === "all") {
         return fetchRangeAll(config, message.dates);
       }
       return fetchRange(config, message.dates);

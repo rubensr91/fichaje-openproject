@@ -90,7 +90,15 @@ function filterCommits(commits, config, user) {
 
 async function fetchDayActivity(config, date, user, project) {
   const { after, before } = localDateRangeToUTC(date);
-  const projectPath = `/projects/${encodeURIComponent(config.gitlabProject)}`;
+  const projectSegment =
+    project.id != null ? String(project.id) : encodeURIComponent(project.path_with_namespace || "");
+  const projectPath = `/projects/${projectSegment}`;
+  const projectInfo = {
+    id: project.id,
+    name: project.name,
+    path: project.path_with_namespace || project.name || "",
+    webUrl: project.web_url || ""
+  };
 
   const [rawCommits, mergeRequests, issues] = await Promise.all([
     getAll(config, `${projectPath}/repository/commits`, {
@@ -126,12 +134,7 @@ async function fetchDayActivity(config, date, user, project) {
       name: user.name,
       email: user.email || ""
     },
-    project: {
-      id: project.id,
-      name: project.name,
-      path: project.path_with_namespace || config.gitlabProject,
-      webUrl: project.web_url || ""
-    },
+    project: projectInfo,
     commits: filtered.commits.map((commit) => ({
       id: commit.id,
       shortId: commit.short_id,
@@ -235,118 +238,178 @@ const TRACKED_ACTIONS = new Set([
   "commented"
 ]);
 
+function eventProjectLabel(projectMeta, projectId) {
+  const project = projectMeta.get(projectId);
+  if (project) {
+    return `[${project.path_with_namespace || project.name || `proyecto ${projectId}`}]`;
+  }
+  return `[proyecto ${projectId}]`;
+}
+
+function itemFromEvent(event, projectLabel, user, kind) {
+  const action = String(event.action_name || "").toLowerCase();
+  const state = mapEventState(action);
+  if (kind === "mr") {
+    return {
+      iid: event.target_iid,
+      title: `${projectLabel} ${event.target_title || "MR"}`,
+      description: "",
+      state,
+      created_at: event.created_at,
+      updated_at: event.created_at,
+      web_url: ""
+    };
+  }
+  if (kind === "issue") {
+    return {
+      iid: event.target_iid,
+      title: `${projectLabel} ${event.target_title || "Issue"}`,
+      description: "",
+      state,
+      created_at: event.created_at,
+      updated_at: event.created_at,
+      web_url: ""
+    };
+  }
+  if (kind === "comment") {
+    return {
+      title: `${projectLabel} comentario: ${event.target_title || ""}`.trim(),
+      message: "",
+      author_name: user.name,
+      author_email: user.email || "",
+      created_at: event.created_at,
+      web_url: "",
+      stats: null
+    };
+  }
+  const pushData = event.push_data || {};
+  const title = pushData.commit_title || event.target_title || "push";
+  return {
+    title: `${projectLabel} ${title}`,
+    message: `${title} | push de ${pushData.commit_count || 1} commit(s) a ${pushData.ref || "?"}`,
+    author_name: user.name,
+    author_email: user.email || "",
+    created_at: event.created_at,
+    web_url: "",
+    stats: null
+  };
+}
+
 export async function fetchRangeAll(config, dates) {
   if (!Array.isArray(dates) || dates.length === 0) {
     throw new Error("El rango de fechas está vacío");
   }
   const user = await getCurrentUser(config);
 
+  // 1. Descubre por día qué proyectos tuvieron actividad (eventos) y guarda los comentarios.
   const eventsByDay = new Map();
-  const projectIds = new Set();
+  const activityProjectsByDay = new Map();
+  const commentsByDay = new Map();
+  const allProjectIds = new Set();
+
   for (const date of dates) {
     const events = (await fetchEventsForDay(config, date)).filter((event) =>
       TRACKED_ACTIONS.has(String(event.action_name || "").toLowerCase())
     );
     eventsByDay.set(date, events);
+
+    const projectIds = new Set();
+    const comments = [];
     for (const event of events) {
-      if (event.project_id) {
-        projectIds.add(event.project_id);
+      if (!event.project_id) {
+        continue;
       }
+      if (String(event.action_name || "").toLowerCase() === "commented") {
+        comments.push(event);
+        allProjectIds.add(event.project_id);
+        continue;
+      }
+      projectIds.add(event.project_id);
+      allProjectIds.add(event.project_id);
     }
+    activityProjectsByDay.set(date, projectIds);
+    commentsByDay.set(date, comments);
   }
 
-  const projectNames = new Map();
-  for (const projectId of projectIds) {
+  // 2. Metadatos de cada proyecto (una sola vez por proyecto distinto).
+  const projectMeta = new Map();
+  for (const projectId of allProjectIds) {
     try {
       const project = await gitlabGet(config, `/projects/${encodeURIComponent(String(projectId))}`, {
         simple: true
       });
-      projectNames.set(projectId, project.path_with_namespace || project.name);
+      projectMeta.set(projectId, project);
     } catch {
-      projectNames.set(projectId, `proyecto ${projectId}`);
+      projectMeta.set(projectId, null);
     }
   }
 
-  const warning =
-    "Extraído de eventos de GitLab: en los pushes solo se ve el último commit. " +
-    "Para el detalle completo, configura un proyecto concreto.";
-
-  return dates.map((date) => {
+  // 3. Detalle completo por proyecto y día; eventos como respaldo.
+  return Promise.all(
+    dates.map(async (date) => {
     const commits = [];
     const mergeRequests = new Map();
     const issues = new Map();
+    const dayEvents = eventsByDay.get(date) || [];
+    const warnings = [];
 
-    for (const event of eventsByDay.get(date) || []) {
-      const projectLabel = `[${projectNames.get(event.project_id) || "proyecto"}]`;
-      const action = String(event.action_name || "").toLowerCase();
+    for (const projectId of activityProjectsByDay.get(date) || []) {
+      const project = projectMeta.get(projectId);
+      const projectLabel = eventProjectLabel(projectMeta, projectId);
+      let detailedOk = false;
 
-      if (action === "pushed to" || action === "pushed new") {
-        const pushData = event.push_data || {};
-        const title = pushData.commit_title || event.target_title || "push";
-        const detail = `push de ${pushData.commit_count || 1} commit(s) a ${
-          pushData.ref || "?"
-        }`;
-        commits.push({
-          title: `${projectLabel} ${title}`,
-          message: `${title} | ${detail}`,
-          author_name: user.name,
-          author_email: user.email || "",
-          created_at: event.created_at,
-          web_url: "",
-          stats: null
-        });
-        continue;
-      }
-
-      if (event.target_type === "MergeRequest") {
-        const existing = mergeRequests.get(event.target_iid);
-        const state = mapEventState(action);
-        if (!existing || state !== "updated") {
-          mergeRequests.set(event.target_iid, {
-            iid: event.target_iid,
-            title: `${projectLabel} ${event.target_title || "MR"}`,
-            description: "",
-            state: state === "updated" ? existing?.state || state : state,
-            created_at: event.created_at,
-            updated_at: event.created_at,
-            web_url: ""
-          });
+      if (project) {
+        try {
+          const detailed = await fetchDayActivity(config, date, user, project);
+          commits.push(...detailed.commits);
+          for (const mr of detailed.mergeRequests) {
+            mergeRequests.set(mr.iid, mr);
+          }
+          for (const issue of detailed.issues) {
+            issues.set(issue.iid, issue);
+          }
+          detailedOk = true;
+          if (detailed.warning) {
+            warnings.push(`${project.path_with_namespace}: ${detailed.warning}`);
+          }
+        } catch (error) {
+          warnings.push(
+            `Detalle de ${project.path_with_namespace} no disponible (${error.message}); se usaron solo los eventos.`
+          );
         }
-        continue;
+      } else {
+        warnings.push(
+          `No se pudo leer el detalle del proyecto ${projectId}; se usaron solo los eventos.`
+        );
       }
 
-      if (event.target_type === "Issue") {
-        const existing = issues.get(event.target_iid);
-        const state = mapEventState(action);
-        if (!existing || state !== "updated") {
-          issues.set(event.target_iid, {
-            iid: event.target_iid,
-            title: `${projectLabel} ${event.target_title || "Issue"}`,
-            description: "",
-            state: state === "updated" ? existing?.state || state : state,
-            created_at: event.created_at,
-            updated_at: event.created_at,
-            web_url: ""
-          });
+      // Añade lo que los eventos ven y el detalle puede no recoger:
+      // pushes si falló el detalle, y MRs/issues cerradas o fusionadas por ti
+      // pero creadas por otra persona (el filtro por autor no las ve).
+      for (const event of dayEvents) {
+        if (event.project_id !== projectId) {
+          continue;
         }
-        continue;
+        const action = String(event.action_name || "").toLowerCase();
+        if ((action === "pushed to" || action === "pushed new") && !detailedOk) {
+          commits.push(itemFromEvent(event, projectLabel, user, "push"));
+        } else if (event.target_type === "MergeRequest" && !mergeRequests.has(event.target_iid)) {
+          mergeRequests.set(event.target_iid, itemFromEvent(event, projectLabel, user, "mr"));
+        } else if (event.target_type === "Issue" && !issues.has(event.target_iid)) {
+          issues.set(event.target_iid, itemFromEvent(event, projectLabel, user, "issue"));
+        }
       }
+    }
 
-      if (action === "commented") {
-        commits.push({
-          title: `${projectLabel} comentario: ${event.target_title || ""}`.trim(),
-          message: "",
-          author_name: user.name,
-          author_email: user.email || "",
-          created_at: event.created_at,
-          web_url: "",
-          stats: null
-        });
-      }
+    // Comentarios: solo existen como eventos.
+    for (const event of commentsByDay.get(date) || []) {
+      const projectLabel = eventProjectLabel(projectMeta, event.project_id);
+      commits.push(itemFromEvent(event, projectLabel, user, "comment"));
     }
 
     const mergeRequestsList = [...mergeRequests.values()];
     const issuesList = [...issues.values()];
+    const warning = [...new Set(warnings)].filter(Boolean).join(" ") || null;
 
     return {
       date,
@@ -371,8 +434,9 @@ export async function fetchRangeAll(config, dates) {
         mergeRequests: mergeRequestsList.length,
         issues: issuesList.length
       }
-    };
-  });
+      };
+    })
+  );
 }
 
 export async function fetchDayAll(config, date) {
@@ -381,7 +445,7 @@ export async function fetchDayAll(config, date) {
 
 export async function testGitLab(config) {
   const user = await getCurrentUser(config);
-  if ((config.gitlabMode || "project") === "all") {
+  if ((config.gitlabMode || "all") === "all") {
     return {
       user: user.username || user.name,
       project: "Todas las contribuciones (eventos)",

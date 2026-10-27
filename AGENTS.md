@@ -76,7 +76,7 @@ background.js
 - `GET /api/v4/user`
 - `GET /api/v4/projects/:id`
 - commits, MRs e issues del proyecto para el día (`fetchDay`) o para un rango (`fetchRange`, usuario y proyecto una sola vez).
-- Modo «Todas las contribuciones» (`gitlabMode: "all"`): `GET /api/v4/events` con ventana amplia (día-1 a día+2) y filtro local por rango UTC del día; agrega actividad de todos los proyectos (`fetchDayAll`/`fetchRangeAll`). Push = solo último commit; MRs/issues sin descripción.
+- Modo por defecto «Todas las contribuciones» (`gitlabMode: "all"`): `GET /api/v4/events` descubre los proyectos activos por día; después `fetchDayActivity` pide el detalle completo de cada proyecto (commits/MRs/issues) y los eventos sirven de respaldo y para comentarios y MRs/issues de terceros cerradas o merged por el usuario. Alternativa: `gitlabMode: "project"` con proyecto concreto.
 - Token con `read_api` o `api`. `read_user` solo no sirve.
 - `isConfigured` solo exige `gitlabProject` en modo `project`.
 
@@ -168,7 +168,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **34/34 tests pasan**.
+Estado verificado: **36/36 tests pasan**.
 
 ## Estado actual y deuda técnica
 

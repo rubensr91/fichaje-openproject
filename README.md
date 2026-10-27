@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.15`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.16`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -39,8 +39,8 @@ Si Brave no soporta `sidePanel`, la extensión abre `sidepanel.html` como pesta�
 
 - URL base: `https://gitlab.example.com` (la de tu instancia)
 - Origen de actividad: dos modos.
-  - **Proyecto concreto** (por defecto): lee commits, MRs e issues del proyecto indicado, con detalle completo (descripciones, todos los commits de cada push).
-  - **Todas las contribuciones**: sin indicar proyecto, usa los eventos de tu usuario de GitLab (`GET /api/v4/events`) y agrega actividad de **todos** los proyectos en los que tocaste algo ese día. Limitación: en cada push solo se ve el **último commit** y las MRs/issues van sin descripción; la API de GitLab no ofrece más detalle de forma agregada.
+  - **Todas las contribuciones** (por defecto): sin indicar proyecto, usa los eventos de tu usuario de GitLab (`GET /api/v4/events`) para descubrir en qué proyectos hubo actividad cada día y, para cada uno, pide el **detalle completo** (commits completos, MRs con descripción, issues). También recoge comentarios y MRs cerradas o fusionadas por ti aunque las creara otra persona. El resumen se **agrupa por proyecto**. Si algún proyecto no está accesible, se avisa y se usan solo sus eventos.
+  - **Proyecto concreto**: lee commits, MRs e issues del proyecto indicado, con detalle completo (descripciones, todos los commits de cada push).
 - Proyecto: `grupo/proyecto`. Solo obligatorio en el modo de proyecto concreto.
 - Token personal con scope **`read_api`** (o `api`). `read_user` solo no permite leer commits, MRs ni issues.
 - Autor GitLab: opcional. Si lo dejas vacío se intenta usar el nombre/email de la cuenta. Si no coincide con el autor de los commits, se incluyen todos los commits del proyecto y se avisa.

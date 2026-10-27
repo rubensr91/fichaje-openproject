@@ -13,7 +13,8 @@ const config = {
   gitlabBaseUrl: "https://gitlab.example.test",
   gitlabProject: "",
   gitlabToken: "test-token",
-  gitlabMode: "all"
+  gitlabMode: "all",
+  gitlabAuthor: "ruben"
 };
 
 const pushEvent = (day, hour, project = 10) => ({
@@ -23,7 +24,12 @@ const pushEvent = (day, hour, project = 10) => ({
   push_data: { commit_title: "feat: ultimo commit", commit_count: 3, ref: "main" }
 });
 
-test("agrega eventos de todos los proyectos en un día", async () => {
+const PROJECTS = {
+  10: { id: 10, name: "web", path_with_namespace: "grupo/web", web_url: "https://gitlab.example.test/grupo/web" },
+  20: { id: 20, name: "api", path_with_namespace: "grupo/api", web_url: "https://gitlab.example.test/grupo/api" }
+};
+
+function mockGitlab({ events, commitsByProject, commitsError = false, projectError = false }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
 
@@ -35,127 +41,177 @@ test("agrega eventos de todos los proyectos en un día", async () => {
       return jsonResponse({ id: 7, username: "ruben", name: "Rubén", email: "ruben@ejemplo.es" });
     }
     if (target.includes("/api/v4/events")) {
-      return jsonResponse([
-        pushEvent("2026-10-26", "09:00", 10),
-        pushEvent("2026-10-26", "10:00", 10),
-        {
-          action_name: "pushed to",
-          created_at: "2026-10-26T11:00:00Z",
-          project_id: 20,
-          push_data: { commit_title: "fix: otro proyecto", commit_count: 1, ref: "dev" }
-        },
-        {
-          action_name: "created",
-          created_at: "2026-10-26T12:00:00Z",
-          project_id: 10,
-          target_type: "MergeRequest",
-          target_iid: 53,
-          target_title: "Notificaciones"
-        },
-        {
-          action_name: "merged",
-          created_at: "2026-10-26T14:00:00Z",
-          project_id: 10,
-          target_type: "MergeRequest",
-          target_iid: 53,
-          target_title: "Notificaciones"
-        },
-        {
-          action_name: "closed",
-          created_at: "2026-10-26T15:00:00Z",
-          project_id: 20,
-          target_type: "Issue",
-          target_iid: 8,
-          target_title: "Bug grave"
-        },
-        {
-          action_name: "commented",
-          created_at: "2026-10-26T16:00:00Z",
-          project_id: 10,
-          target_type: "Note",
-          target_title: "Revisado en reunión"
-        },
-        // Fuera del rango local del día en cualquier zona horaria: debe descartarse.
-        {
-          action_name: "pushed to",
-          created_at: "2026-10-30T12:00:00Z",
-          project_id: 10,
-          push_data: { commit_title: "commit de otro día", commit_count: 1, ref: "main" }
-        }
-      ]);
+      return jsonResponse(events);
     }
-    if (/\/api\/v4\/projects\/(10|20)(\?|$)/.test(target)) {
-      const id = new URL(target).pathname.split("/").pop();
-      return jsonResponse({ id: Number(id), name: `proyecto-${id}`, path_with_namespace: `grupo/proyecto-${id}` });
+    const projectMatch = /\/api\/v4\/projects\/(\d+)(?=\/|\?|$)/.exec(target);
+    if (projectMatch) {
+      const projectId = Number(projectMatch[1]);
+      if (projectError) {
+        return new Response("no existe", { status: 404 });
+      }
+      if (target.includes("/repository/commits")) {
+        if (commitsError) {
+          return new Response("error", { status: 500 });
+        }
+        return jsonResponse(commitsByProject[projectId] || []);
+      }
+      if (target.includes("/merge_requests") || target.includes("/issues")) {
+        return jsonResponse([]);
+      }
+      return jsonResponse(PROJECTS[projectId]);
     }
     throw new Error(`Petición inesperada: ${target}`);
   };
+
+  return {
+    calls,
+    restore() {
+      globalThis.fetch = originalFetch;
+    }
+  };
+}
+
+test("enriquece los eventos con el detalle completo por proyecto", async () => {
+  const mock = mockGitlab({
+    events: [
+      pushEvent("2026-10-26", "09:00", 10),
+      pushEvent("2026-10-26", "10:00", 10),
+      pushEvent("2026-10-26", "11:00", 20),
+      {
+        action_name: "created",
+        created_at: "2026-10-26T12:00:00Z",
+        project_id: 10,
+        target_type: "MergeRequest",
+        target_iid: 53,
+        target_title: "Notificaciones"
+      },
+      {
+        action_name: "closed",
+        created_at: "2026-10-26T15:00:00Z",
+        project_id: 20,
+        target_type: "Issue",
+        target_iid: 8,
+        target_title: "Bug grave"
+      },
+      {
+        action_name: "commented",
+        created_at: "2026-10-26T16:00:00Z",
+        project_id: 10,
+        target_type: "Note",
+        target_title: "Revisado en reunión"
+      },
+      // Otro día: debe descartarse en cualquier zona horaria.
+      pushEvent("2026-10-30", "12:00", 10)
+    ],
+    commitsByProject: {
+      10: [
+        { title: "feat: login", message: "feat: login", author_name: "ruben", author_email: "ruben@ejemplo.es", created_at: "2026-10-26T08:50:00Z" },
+        { title: "fix: rutas", message: "fix: rutas", author_name: "ruben", author_email: "ruben@ejemplo.es", created_at: "2026-10-26T09:55:00Z" }
+      ],
+      20: [
+        { title: "feat: endpoint", message: "feat: endpoint", author_name: "ruben", author_email: "ruben@ejemplo.es", created_at: "2026-10-26T10:40:00Z" }
+      ]
+    }
+  });
 
   try {
     const day = await fetchDayAll(config, "2026-10-26");
 
-    assert.equal(day.date, "2026-10-26");
-    assert.equal(day.project.path, "Todas las contribuciones");
-
-    // 3 pushes dentro del día + 1 comentario; el push del día siguiente se excluye.
+    // 3 commits reales (2 + 1) + 1 comentario. Sin duplicar el push de eventos.
     assert.equal(day.counts.commits, 4);
     assert.equal(day.counts.mergeRequests, 1);
     assert.equal(day.counts.issues, 1);
 
-    const mr = day.mergeRequests[0];
-    assert.match(mr.title, /\[grupo\/proyecto-10\] Notificaciones/);
-    // El evento merged (posterior) pisa el estado de created.
-    assert.equal(mr.state, "merged");
+    assert.ok(day.commits.some((commit) => commit.title === "feat: login"));
+    assert.ok(day.commits.some((commit) => commit.title === "feat: endpoint"));
+    assert.ok(day.commits.some((commit) => commit.title.includes("comentario: Revisado en reunión")));
+    assert.ok(day.commits.every((commit) => !commit.title.includes("ultimo commit")));
 
-    const issue = day.issues[0];
-    assert.equal(issue.state, "closed");
-    assert.match(issue.title, /\[grupo\/proyecto-20\] Bug grave/);
+    // MR del respaldo de eventos, con prefijo de proyecto.
+    assert.equal(day.mergeRequests[0].title, "[grupo/web] Notificaciones");
+    assert.equal(day.mergeRequests[0].description, "");
 
-    const withPrefix = day.commits.filter((commit) => commit.title.includes("[grupo/proyecto-"));
-    assert.equal(withPrefix.length, 4);
-    assert.ok(day.commits.every((commit) => !commit.title.includes("otro día")));
+    // Issue con estado real.
+    assert.equal(day.issues[0].state, "closed");
 
-    // Nombres de proyecto pedidos una sola vez por id distinto.
-    const projectCalls = calls.filter((url) => /\/api\/v4\/projects\/\d+/.test(url));
-    assert.equal(projectCalls.length, 2);
+    // Sin aviso cuando todo el detalle está disponible.
+    assert.equal(day.warning, null);
 
-    // Ventana amplia en el endpoint de eventos.
-    const eventCalls = calls.filter((url) => url.includes("/api/v4/events"));
-    assert.equal(eventCalls.length, 1);
-    assert.match(eventCalls[0], /after=2026-10-25/);
-    assert.match(eventCalls[0], /before=2026-10-28/);
+    // Metadatos pedidos una vez por proyecto distinto.
+    const metaCalls = mock.calls.filter(
+      (url) => /\/api\/v4\/projects\/\d+\?/.test(url) && !url.includes("/repository/") && !url.includes("/merge_requests") && !url.includes("/issues")
+    );
+    assert.equal(metaCalls.length, 2);
   } finally {
-    globalThis.fetch = originalFetch;
+    mock.restore();
   }
 });
 
-test("fetchRangeAll funciona para varios días", async () => {
-  const originalFetch = globalThis.fetch;
-  let eventCalls = 0;
+test("si falla el detalle de un proyecto, usa los eventos como respaldo", async () => {
+  const mock = mockGitlab({
+    events: [pushEvent("2026-10-26", "09:00", 10)],
+    commitsByProject: {},
+    commitsError: true
+  });
 
-  globalThis.fetch = async (url) => {
-    const target = String(url);
-    if (target.includes("/api/v4/user")) {
-      return jsonResponse({ id: 7, username: "ruben", name: "Rubén" });
-    }
-    if (target.includes("/api/v4/events")) {
-      eventCalls += 1;
-      const day = eventCalls === 1 ? "2026-10-26" : "2026-10-30";
-      return jsonResponse([pushEvent(day, "09:00")]);
-    }
-    if (/\/api\/v4\/projects\/10(\?|$)/.test(target)) {
-      return jsonResponse({ id: 10, name: "web", path_with_namespace: "demo/web" });
-    }
-    throw new Error(`Petición inesperada: ${target}`);
-  };
+  try {
+    const day = await fetchDayAll(config, "2026-10-26");
+
+    // Respaldo: el push del evento entra como item.
+    assert.equal(day.counts.commits, 1);
+    assert.match(day.commits[0].title, /\[grupo\/web\] feat: ultimo commit/);
+    assert.match(day.warning, /no disponible/);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("recoge MRs merged por ti aunque las creara otra persona", async () => {
+  const mock = mockGitlab({
+    events: [
+      {
+        action_name: "merged",
+        created_at: "2026-10-26T14:00:00Z",
+        project_id: 10,
+        target_type: "MergeRequest",
+        target_iid: 77,
+        target_title: "MR de otra persona"
+      }
+    ],
+    commitsByProject: { 10: [] }
+  });
+
+  try {
+    const day = await fetchDayAll(config, "2026-10-26");
+    // Sin commits propios y sin MRs propias en el detalle, el evento añade la MR merged.
+    assert.equal(day.counts.mergeRequests, 1);
+    assert.match(day.mergeRequests[0].title, /MR de otra persona/);
+    assert.equal(day.mergeRequests[0].state, "merged");
+    assert.equal(day.counts.commits, 0);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("cada día del rango recibe su propia actividad", async () => {
+  const mock = mockGitlab({
+    events: [pushEvent("2026-10-26", "09:00", 10), pushEvent("2026-10-30", "09:00", 10)],
+    commitsByProject: {},
+    commitsError: true
+  });
 
   try {
     const days = await fetchRangeAll(config, ["2026-10-26", "2026-10-30"]);
+    // Detalle no disponible: ambos días caen al respaldo de eventos,
+    // cada uno con su propio push y su propia ventana de eventos.
     assert.equal(days.length, 2);
     assert.equal(days[0].counts.commits, 1);
     assert.equal(days[1].counts.commits, 1);
-    assert.equal(eventCalls, 2);
+    const eventCalls = mock.calls.filter((url) => url.includes("/api/v4/events"));
+    assert.equal(eventCalls.length, 2);
+    assert.match(eventCalls[0], /after=2026-10-25/);
+    assert.match(eventCalls[1], /after=2026-10-29/);
   } finally {
-    globalThis.fetch = originalFetch;
+    mock.restore();
   }
 });

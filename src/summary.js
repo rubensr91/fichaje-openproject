@@ -53,6 +53,20 @@ export function normalizeEvidence(evidence = {}) {
   };
 }
 
+function groupByProjectPrefix(titles) {
+  const groups = new Map();
+  for (const title of titles) {
+    const match = /^\[([^\]]+)\]\s*(.*)$/.exec(title);
+    const key = match ? match[1] : "";
+    const rest = match ? match[2] : title;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(rest);
+  }
+  return groups;
+}
+
 export function fallbackSummary(evidence, projectName = "") {
   const data = normalizeEvidence(evidence);
   const titles = uniqueTitles(
@@ -61,15 +75,26 @@ export function fallbackSummary(evidence, projectName = "") {
       ...data.mergeRequests.map((mr) => `!${mr.iid} ${mr.title}`),
       ...data.issues.map((issue) => `#${issue.iid} ${issue.title}`)
     ],
-    8
+    12
   );
 
   if (titles.length === 0) {
     return "Sin actividad registrada en GitLab para este día.";
   }
 
-  const prefix = projectName ? `${projectName}: ` : "";
-  return `${prefix}\n${titles.map((title) => `• ${title}`).join("\n")}`;
+  const groups = groupByProjectPrefix(titles);
+  if (groups.size === 1 && groups.has("")) {
+    const prefix = projectName ? `${projectName}: ` : "";
+    return `${prefix}\n${[...groups.values()][0].map((title) => `• ${title}`).join("\n")}`;
+  }
+
+  const blocks = [];
+  for (const [project, items] of groups) {
+    blocks.push(`**${project || projectName || "General"}**`);
+    blocks.push(...items.map((title) => `• ${title}`));
+    blocks.push("");
+  }
+  return blocks.join("\n").trim();
 }
 
 export function buildEvidenceText(evidence, date, projectName) {
@@ -106,8 +131,14 @@ export function buildLlmMessagesFromText(evidenceText) {
       role: "system",
       content:
         "Redactas partes de trabajo diarios en español para una herramienta de fichaje. " +
-        "Resume únicamente el trabajo evidenciado en los datos. No inventes tareas, no menciones horas y no des consejos. " +
-        "Devuelve solo el texto del resumen, en 2 a 5 líneas, con viñetas si ayuda. Sé concreto y técnico."
+        "Resume únicamente el trabajo evidenciado en los datos y cita tareas, commits o incidencias " +
+        "concretas de la lista. No inventes tareas, no uses frases genéricas, no repitas el mismo " +
+        "resumen entre días distintos, no menciones horas y no des consejos. " +
+        "Si los datos contienen actividad de varios proyectos (cada elemento va marcado como [proyecto]), " +
+        "agrupa el resumen por proyecto con un apartado por proyecto en el mismo orden en que aparecen. " +
+        "Si solo hay un proyecto, resume como de costumbre. " +
+        "Si el día no tiene ningún elemento, responde exactamente: Sin actividad registrada en GitLab para este día. " +
+        "Devuelve solo el texto del resumen, en 2 a 6 líneas, con viñetas si ayuda. Sé concreto y técnico."
     },
     {
       role: "user",
