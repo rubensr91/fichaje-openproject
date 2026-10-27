@@ -16,15 +16,17 @@ Pensada para Chrome/Brave, sin backend y sin build.
 ```mermaid
 flowchart LR
     A["OpenProject<br/>¿qué días están ya fichados?"] --> B["GitLab<br/>actividad de los días sin fichar"]
-    B --> C["LLM<br/>resumen en texto"]
+    B -- "filtrado de secretos<br/>antes de enviar" --> C["LLM<br/>resumen en texto"]
     C --> D["OpenProject<br/>crear los fichajes"]
 ```
 
-Idea general: mira qué días ya tienen fichaje, saca tu actividad de GitLab solo de los que faltan, pide a un LLM que la resuma y escribe los fichajes en OpenProject. Los días ya fichados no se envían al LLM: se ahorran tokens.
+Idea general: mira qué días ya tienen fichaje, saca tu actividad de GitLab solo de los que faltan, **filtra esa actividad** (tokens, claves, contraseñas y otros secretos reconocibles) antes de pasarla al LLM, y escribe los fichajes en OpenProject. Los días ya fichados no se envían al LLM: se ahorran tokens.
+
+Todo lo que va al LLM pasa antes por `src/redact.js`: sustituye los secretos reconocidos por marcadores `[REDACTED:...]` o, en modo estricto, cancela el envío y usa el resumen local. Ver [Filtro antes del LLM](#filtro-antes-del-llm).
 
 ## Estado
 
-MVP, versión `0.1.32`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.33`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
