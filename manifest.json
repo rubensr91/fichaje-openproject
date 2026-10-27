@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fichaje GitLab → OpenProject",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "description": "Resume el trabajo del día en GitLab y crea fichajes en OpenProject.",
   "icons": {
     "16": "icons/icon-16.png",
