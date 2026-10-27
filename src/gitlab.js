@@ -88,9 +88,8 @@ function filterCommits(commits, config, user) {
   return { commits: matched, warning: null };
 }
 
-export async function fetchDay(config, date) {
+async function fetchDayActivity(config, date, user, project) {
   const { after, before } = localDateRangeToUTC(date);
-  const [user, project] = await Promise.all([getCurrentUser(config), getProject(config)]);
   const projectPath = `/projects/${encodeURIComponent(config.gitlabProject)}`;
 
   const [rawCommits, mergeRequests, issues] = await Promise.all([
@@ -169,6 +168,23 @@ export async function fetchDay(config, date) {
       issues: issues.length
     }
   };
+}
+
+export async function fetchDay(config, date) {
+  const [user, project] = await Promise.all([getCurrentUser(config), getProject(config)]);
+  return fetchDayActivity(config, date, user, project);
+}
+
+export async function fetchRange(config, dates) {
+  if (!Array.isArray(dates) || dates.length === 0) {
+    throw new Error("El rango de fechas está vacío");
+  }
+  const [user, project] = await Promise.all([getCurrentUser(config), getProject(config)]);
+  const days = [];
+  for (const date of dates) {
+    days.push(await fetchDayActivity(config, date, user, project));
+  }
+  return days;
 }
 
 export async function testGitLab(config) {

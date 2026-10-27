@@ -51,10 +51,27 @@
       </section>
 
       <section class="card main-card">
-        <label class="field">
+        <div class="mode-toggle" role="group" aria-label="Modo de fichaje">
+          <button id="modeDaily" class="mode-btn active" type="button">Diario</button>
+          <button id="modeWeekly" class="mode-btn" type="button">Semanal</button>
+        </div>
+
+        <label class="field" id="dateField">
           <span>Día</span>
           <input id="date" type="date" />
         </label>
+
+        <div class="field-row hidden" id="weekFields">
+          <label class="field">
+            <span>Desde</span>
+            <input id="weekFrom" type="date" />
+          </label>
+          <label class="field">
+            <span>Hasta</span>
+            <input id="weekTo" type="date" />
+          </label>
+        </div>
+        <p id="weekHint" class="hint hidden">El tramo horario se aplica igual a cada día del rango.</p>
 
         <div class="field-row">
           <label class="field">
@@ -103,6 +120,14 @@
         <button id="generateBtn" class="button primary" type="button">Generar resumen</button>
         <button id="postBtn" class="button secondary" type="button" disabled>Fichar</button>
       </div>
+
+      <section id="weeklySection" class="card hidden">
+        <div class="section-head">
+          <h2>Resumen por día</h2>
+          <span id="weeklyProgress" class="hint"></span>
+        </div>
+        <div id="weeklyDays"></div>
+      </section>
 
       <section id="summarySection" class="card hidden">
         <div class="section-head">

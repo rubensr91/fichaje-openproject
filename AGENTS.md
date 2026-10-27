@@ -75,8 +75,16 @@ background.js
 
 - `GET /api/v4/user`
 - `GET /api/v4/projects/:id`
-- commits, MRs e issues del proyecto para el día seleccionado.
+- commits, MRs e issues del proyecto para el día (`fetchDay`) o para un rango (`fetchRange`, usuario y proyecto una sola vez).
 - Token con `read_api` o `api`. `read_user` solo no sirve.
+
+### Modo semanal
+
+- Mensajes nuevos en `background.js`: `FETCH_RANGE`, `CHECK_EXISTING_RANGE`, `CREATE_ENTRIES`.
+- `CHECK_EXISTING_RANGE` agrupa fichajes por día con `spent_on =d` multi-fecha (`getExistingEntriesForDates`).
+- `CREATE_ENTRIES` comprueba duplicados, detecta la actividad una vez y crea día a día, saltando los que ya tienen fichaje. Devuelve `created`/`skipped`/`failed`.
+- El panel muestra una tarjeta por día con resumen editable y casilla de inclusión; los días sin actividad quedan desmarcados.
+- El tramo horario es el mismo para todos los días del rango.
 
 ### Resumen
 
@@ -158,13 +166,13 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **24/24 tests pasan**.
+Estado verificado: **32/32 tests pasan**.
 
 ## Estado actual y deuda técnica
 
 - Una sola cuenta/proyecto GitLab.
 - Varios proyectos OpenProject, uno por fichaje.
-- Un solo tramo por fichaje.
+- En modo semanal, un único tramo horario compartido por todos los días.
 - Actividad fija `Development`.
 - Sin tests de integración ni E2E con navegador.
 - Sin i18n.

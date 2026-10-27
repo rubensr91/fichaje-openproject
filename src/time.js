@@ -50,6 +50,49 @@ export function todayISO(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function enumerateDates(fromISO, toISO, maxDays = 31) {
+  assertDateISO(fromISO);
+  assertDateISO(toISO);
+
+  const start = new Date(`${fromISO}T00:00:00`);
+  const end = new Date(`${toISO}T00:00:00`);
+  if (end < start) {
+    throw new Error("La fecha final debe ser posterior o igual a la inicial");
+  }
+
+  const dates = [];
+  for (let current = new Date(start); current <= end; current.setDate(current.getDate() + 1)) {
+    dates.push(todayISO(current));
+    if (dates.length > maxDays) {
+      throw new Error(`El rango no puede superar ${maxDays} días`);
+    }
+  }
+  return dates;
+}
+
+export function defaultWeekRange(dateLike = new Date()) {
+  const monday = new Date(dateLike);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const friday = new Date(monday);
+  friday.setDate(friday.getDate() + 4);
+  return { from: todayISO(monday), to: todayISO(friday) };
+}
+
+export function formatDurationISO(duration) {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?$/.exec(String(duration || ""));
+  if (!match) {
+    return String(duration || "");
+  }
+  const parts = [];
+  if (Number(match[1])) {
+    parts.push(`${match[1]} h`);
+  }
+  if (Number(match[2])) {
+    parts.push(`${match[2]} min`);
+  }
+  return parts.join(" ") || "0 min";
+}
+
 export function assertDateISO(value) {
   if (!DATE_RE.test(String(value || ""))) {
     throw new Error(`Fecha no válida: ${value}`);

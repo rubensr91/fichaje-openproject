@@ -13,7 +13,7 @@ Pensada para Chrome/Brave, sin backend y sin build.
 
 ## Estado
 
-MVP, versión `0.1.13`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.14`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -97,15 +97,34 @@ El filtro reduce el riesgo, pero **no garantiza** detectar cualquier secreto. Un
 
 El tramo se puede cambiar antes de generar el resumen.
 
+### Modo semanal
+
+Además del modo diario, la extensión tiene un modo **Semanal**:
+
+1. Cambia el interruptor a **Semanal**.
+2. Elige el rango de días (por defecto, lunes a viernes de la semana actual; máximo 31 días).
+3. Pulsa **Generar semana**.
+4. La extensión lee GitLab para cada día, pide un resumen al LLM día a día y muestra una tarjeta por día.
+5. Revisa y edita cada resumen, marca o desmarca los días a fichar.
+6. Pulsa **Fichar** y confirma una vez con el listado de días.
+
+Detalles:
+
+- El tramo horario (inicio/fin) se aplica igual a todos los días.
+- Los días sin actividad en GitLab quedan **desmarcados** por defecto (con su texto local); puedes marcarlos y editar el texto a mano.
+- Los días que ya tienen un fichaje en ese proyecto aparecen como **Ya fichado** y se omiten automáticamente.
+- Si algún día falla al crear, el resto sigue; el error se muestra en su tarjeta y puedes volver a intentarlo.
+
 ## Uso
 
-1. Elige el día.
-2. Ajusta inicio y fin.
-3. Elige el proyecto de OpenProject y el work package.
-4. Pulsa **Generar resumen**.
-5. Revisa y edita el texto.
-6. Pulsa **Fichar**.
-7. Confirma.
+1. Elige el modo: diario o semanal.
+2. Elige el día (o el rango de días).
+3. Ajusta inicio y fin.
+4. Elige el proyecto de OpenProject y el work package.
+5. Pulsa **Generar resumen** (o **Generar semana**).
+6. Revisa y edita el texto.
+7. Pulsa **Fichar**.
+8. Confirma.
 
 Los proyectos salen de `GET /api/v3/time_entries/available_projects`, es decir, solo aquellos en los que puedes fichar. Los work packages se cargan al elegir proyecto y se filtran por permiso de fichaje. En el desplegable aparecen como `#1234 · Tarea de ejemplo [In progress]`. El campo **Buscar tarea** filtra por código, asunto, estado o tipo.
 
@@ -163,7 +182,7 @@ En **Ajustes → Seguridad de tokens**:
 
 - Un solo proyecto GitLab.
 - Varios proyectos OpenProject, pero solo uno por fichaje.
-- Un solo tramo por fichaje.
+- En modo semanal, un único tramo horario compartido por todos los días.
 - La actividad está fijada a `Development`.
 - La detección de autoría de commits puede requerir configurar `Autor GitLab`.
 - No hay tests de integración contra GitLab/OpenProject.

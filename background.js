@@ -1,15 +1,31 @@
 import { getRuntimeConfig } from "./src/secrets.js";
-import { fetchDay, testGitLab } from "./src/gitlab.js";
+import { fetchDay, fetchRange, testGitLab } from "./src/gitlab.js";
 import {
   createTimeEntry,
   detectActivity,
   getAvailableProjects,
   getCurrentUser,
   getExistingEntries,
+  getExistingEntriesForDates,
   getProjectWorkPackages,
   testOpenProject
 } from "./src/openproject.js";
 import { summarize } from "./src/llm.js";
+
+function groupEntriesByDate(entries) {
+  const byDate = new Map();
+  for (const entry of entries) {
+    const date = String(entry.spentOn || "").slice(0, 10);
+    if (!date) {
+      continue;
+    }
+    if (!byDate.has(date)) {
+      byDate.set(date, []);
+    }
+    byDate.get(date).push(entry);
+  }
+  return byDate;
+}
 
 function configureSidePanel() {
   if (chrome.sidePanel?.setPanelBehavior) {
@@ -74,6 +90,10 @@ async function handle(message) {
       return data;
     }
 
+    case "FETCH_RANGE": {
+      return fetchRange(config, message.dates);
+    }
+
     case "GENERATE_SUMMARY": {
       if (!message.evidence) {
         throw new Error("Faltan los datos de GitLab");
@@ -92,6 +112,57 @@ async function handle(message) {
         user: { id: user.id, name: user.name || user.login },
         entries
       };
+    }
+
+    case "CHECK_EXISTING_RANGE": {
+      const user = await getCurrentUser(config);
+      const entries = await getExistingEntriesForDates(config, message.dates, user);
+      return {
+        user: { id: user.id, name: user.name || user.login },
+        byDate: Object.fromEntries(groupEntriesByDate(entries))
+      };
+    }
+
+    case "CREATE_ENTRIES": {
+      const dates = message.entries.map((item) => item.date);
+      const user = await getCurrentUser(config);
+      const existing = await getExistingEntriesForDates(config, dates, user);
+      const byDate = groupEntriesByDate(existing);
+
+      const activity = await detectActivity(
+        config,
+        config.openprojectActivityName || "Development"
+      );
+
+      const results = { created: [], skipped: [], failed: [] };
+      for (const item of message.entries) {
+        const already = byDate.get(item.date) || [];
+        if (already.length) {
+          results.skipped.push({
+            date: item.date,
+            reason: `Ya existía un fichaje (ID ${already.map((entry) => entry.id).join(", ")})`
+          });
+          continue;
+        }
+        try {
+          const entry = await createTimeEntry(config, {
+            date: item.date,
+            start: item.start,
+            end: item.end,
+            comment: item.comment,
+            activity
+          });
+          results.created.push({
+            date: item.date,
+            id: entry.id,
+            hours: entry.hours || null
+          });
+          byDate.set(item.date, [entry]);
+        } catch (error) {
+          results.failed.push({ date: item.date, error: error.message });
+        }
+      }
+      return results;
     }
 
     case "DETECT_ACTIVITY": {

@@ -232,8 +232,16 @@ function projectHrefMatches(entry, projectId) {
 }
 
 export async function getExistingEntries(config, date, user) {
+  return getExistingEntriesForDates(config, [date], user);
+}
+
+export async function getExistingEntriesForDates(config, dates, user) {
+  if (!Array.isArray(dates) || dates.length === 0) {
+    throw new Error("Faltan fechas para comprobar fichajes");
+  }
+
   const filters = [
-    { spent_on: { operator: "=d", values: [date] } },
+    { spent_on: { operator: "=d", values: dates } },
     { user_id: { operator: "=", values: [String(user.id)] } }
   ];
 

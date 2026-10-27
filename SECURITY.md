@@ -173,6 +173,8 @@ Límites:
 - no sustituye la revisión humana ni la política de datos de la empresa;
 - el resumen local puede seguir mostrando el texto original en la UI.
 
+En modo semanal se hace **una llamada al LLM por día**, siempre con el mismo filtro aplicado a cada texto.
+
 ### OpenProject
 
 El token puede escribir fichajes. La extensión comprueba duplicados por día y proyecto, pero no sustituye una revisión humana. Revisa los fichajes antes de usarlos en producción.

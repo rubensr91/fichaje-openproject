@@ -111,6 +111,102 @@ main {
   gap: 12px;
 }
 
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.mode-btn {
+  min-height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow);
+}
+
+.week-day {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.week-day + .week-day {
+  margin-top: 8px;
+}
+
+.week-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.week-day-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.week-day-title input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.week-day-title strong {
+  font-weight: 700;
+}
+
+.week-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+.week-day.done {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.week-day.error {
+  border-color: var(--danger);
+}
+
+.week-warn {
+  color: var(--warn-line);
+  font-size: 11px;
+}
+
+.week-summary {
+  min-height: 70px;
+  padding: 7px 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .locked-banner {
   border-color: var(--warn-line);
   background: var(--warn-bg);
