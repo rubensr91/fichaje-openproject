@@ -84,9 +84,10 @@ background.js
 ### Líneas de fichaje y modo rango (varios días)
 
 - Mensajes nuevos en `background.js`: `FETCH_RANGE`, `CHECK_EXISTING_RANGE`, `CREATE_ENTRIES`.
-- `CHECK_EXISTING_RANGE` agrupa fichajes por día con `spent_on =d` multi-fecha (`getExistingEntriesForDates`). El mensaje acepta `projectId` opcional.
+- `CHECK_EXISTING_RANGE` consulta los existentes **una petición por día** con `spent_on =d` mono-valor, paginación (≤3 páginas) y recorte por proyecto en cliente (`getExistingEntriesForDates`). Ni `=d` multi-fecha (devuelve solo parte de los días) ni `><` (algunas instancias lo rechazan con 400 «Filters is not set to one of the allowed values») son fiables. El mensaje acepta `projectId` opcional. Con rangos largos esto multiplica peticiones: 31 días ≈ 31 GET.
 - `CREATE_ENTRIES` recibe `{ lineId, date, start, end, projectId, workPackageId, comment, allowExisting }`. Detecta la actividad una vez. La política de duplicados vive en `src/weekly.js::planEntryActions` (consumir-una: los existentes del par (día, proyecto) se asignan a las primeras líneas no-`allowExisting`; el resto se crea). Devuelve `created`/`skipped`/`failed` con `lineId`.
 - El panel comparte motor para Diario y Rango: `state.weekly.days[]` con `lines[]`. Cada línea tiene casilla, tramo, proyecto, tarea y resumen propios. Botón **+ Añadir tarea** por tarjeta (siempre activo); el resumen del LLM rellena la primera línea (casilla «Fichar este día»; extras «Fichar esta tarea»).
+- Al generar, **primero** se consultan los fichajes existentes (`CHECK_EXISTING_RANGE`/`CHECK_EXISTING`) y **después** GitLab solo para los días sin fichar (`FETCH_RANGE` con las fechas pendientes). Los días ya fichados tampoco se envían al LLM (`summarizeDay` sale antes).
 - En modo eventos (`fetchRangeAll`), cada item lleva `project` (`grupo/proyecto`) y el día expone `projects[]`. `buildEvidenceText` prefija los items con `[project]`; el `projectName` que envía el panel es la lista `projects.join(", ")`. No debe aparecer la etiqueta «Todas las contribuciones» en los resúmenes.
 - `src/weekly.js` tiene helpers puros testeables: `pairKey`, `planEntryActions`, `filterWorkPackages`, `autoSelectWorkPackage`.
 - En cada línea, proyecto y tarea ocupan **filas separadas** (`.week-line-targets`). La tarea incluye **buscador**: filtra por código/asunto/estado/tipo (`filterWorkPackages`) y **autoselecciona** si el texto coincide exactamente con el código o el asunto (`autoSelectWorkPackage`). El buscador no repinta la tarjeta: rellena el `<select>` in-place (`fillTaskSelect`).
@@ -172,7 +173,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **51/51 tests pasan**.
+Estado verificado: **53/53 tests pasan**.
 
 ## Estado actual y deuda técnica
 

@@ -240,19 +240,47 @@ export async function getExistingEntriesForDates(config, dates, user, projectId 
     throw new Error("Faltan fechas para comprobar fichajes");
   }
   const targetProject = String(projectId || config.openprojectProjectId || "").trim();
+  const wanted = new Set(dates.map((date) => String(date)));
 
-  const filters = [
-    { spent_on: { operator: "=d", values: dates } },
-    { user_id: { operator: "=", values: [String(user.id)] } }
-  ];
+  const collected = new Map();
+  for (const date of wanted) {
+    // `=d` mono-fecha es el operador que todas las versiones aceptan.
+    // `><` está restringido en algunas instancias (400) y `=d` multi-valor
+    // no devuelve todos los días.
+    const filters = [
+      { spent_on: { operator: "=d", values: [date] } },
+      { user_id: { operator: "=", values: [String(user.id)] } }
+    ];
 
-  const collection = await opGet(config, "/time_entries", {
-    pageSize: 100,
-    filters: JSON.stringify(filters)
-  });
+    let offset = 1;
+    let fetched = 0;
+    while (offset <= 3) {
+      const collection = await opGet(config, "/time_entries", {
+        pageSize: 100,
+        offset,
+        filters: JSON.stringify(filters)
+      });
+      const page = collection?._embedded?.elements || [];
+      fetched += page.length;
+      for (const entry of page) {
+        const spentOn = String(entry.spentOn || "").slice(0, 10);
+        if (spentOn !== date) {
+          continue;
+        }
+        if (!projectHrefMatches(entry, targetProject)) {
+          continue;
+        }
+        collected.set(String(entry.id), entry);
+      }
+      const total = Number(collection?.total || fetched);
+      if (page.length === 0 || fetched >= total) {
+        break;
+      }
+      offset += 1;
+    }
+  }
 
-  const entries = collection?._embedded?.elements || [];
-  return entries.filter((entry) => projectHrefMatches(entry, targetProject));
+  return [...collected.values()];
 }
 
 function activityHref(config, activity) {

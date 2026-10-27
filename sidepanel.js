@@ -965,9 +965,11 @@ function renderWeekDay(day) {
   const counts = day.evidence?.counts || {};
   const badges = document.createElement("span");
   badges.className = "week-badges";
-  badges.textContent = `${counts.commits || 0} commits · ${counts.mergeRequests || 0} MRs · ${
-    counts.issues || 0
-  } issues`;
+  badges.textContent = day.evidence
+    ? `${counts.commits || 0} commits · ${counts.mergeRequests || 0} MRs · ${
+        counts.issues || 0
+      } issues`
+    : "GitLab no consultado (día ya fichado)";
   head.append(badges);
 
   const dayWarn = document.createElement("p");
@@ -980,7 +982,7 @@ function renderWeekDay(day) {
 
   card.append(head, dayWarn);
 
-  if (!day.hasActivity && day.lines.length === 1 && !day.lines[0].textEdited) {
+  if (day.evidence && !day.hasActivity && day.lines.length === 1 && !day.lines[0].textEdited) {
     const note = document.createElement("p");
     note.className = "hint";
     note.textContent =
@@ -1128,14 +1130,20 @@ async function generate() {
   setStatus("Leyendo actividad de GitLab...");
 
   try {
-    const [evidence, existing] = await Promise.all([
-      send({ type: "FETCH_DAY", date }),
-      send({ type: "CHECK_EXISTING", date })
-        .then((data) => ({ byDate: { [date]: data.entries || [] } }))
-        .catch((error) => ({ byDate: {}, error: error.message }))
-    ]);
+    // Primero OpenProject: si el día ya está fichado no se consulta GitLab
+    // ni se envía al LLM.
+    setStatus("Comprobando fichajes existentes en OpenProject...");
+    const existing = await send({ type: "CHECK_EXISTING", date })
+      .then((data) => ({ byDate: { [date]: data.entries || [] } }))
+      .catch((error) => ({ byDate: {}, error: error.message }));
 
-    await runGenerate([date], [evidence], existing.byDate, existing.error);
+    let evidenceList = [];
+    if (!(existing.byDate[date] || []).length) {
+      setStatus("Leyendo actividad de GitLab...");
+      evidenceList = [await send({ type: "FETCH_DAY", date })];
+    }
+
+    await runGenerate([date], evidenceList, existing.byDate, existing.error);
     setStatus("Resumen listo. Revísalo, añade tareas si quieres dividir el día y pulsa Fichar.");
   } catch (error) {
     setStatus(error.message, "error");
@@ -1183,13 +1191,24 @@ async function generateWeek() {
   setStatus("Leyendo GitLab para el rango...");
 
   try {
-    const [evidenceList, existing] = await Promise.all([
-      send({ type: "FETCH_RANGE", dates }),
-      send({ type: "CHECK_EXISTING_RANGE", dates }).catch((error) => ({
-        error: error.message,
-        byDate: {}
-      }))
-    ]);
+    // Primero OpenProject: los días ya fichados no se consultan en GitLab
+    // ni se envían al LLM (ahorro de tokens y de llamadas).
+    setStatus("Comprobando fichajes existentes en OpenProject...");
+    const existing = await send({ type: "CHECK_EXISTING_RANGE", dates }).catch((error) => ({
+      error: error.message,
+      byDate: {}
+    }));
+
+    const pendingDates = dates.filter((date) => !(existing.byDate?.[date] || []).length);
+    let evidenceList = [];
+    if (pendingDates.length) {
+      setStatus(
+        pendingDates.length === dates.length
+          ? "Leyendo GitLab para el rango..."
+          : `Leyendo GitLab para ${pendingDates.length} día(s) sin fichar...`
+      );
+      evidenceList = await send({ type: "FETCH_RANGE", dates: pendingDates });
+    }
 
     await runGenerate(dates, evidenceList, existing.byDate, existing.error);
     setStatus("Resúmenes listos. Revisa cada día, divide tareas si quieres y pulsa Fichar.");
