@@ -30,7 +30,7 @@ Todo lo que va al LLM pasa antes por `src/redact.js`: sustituye los secretos rec
 
 ## Estado
 
-MVP, versión `0.1.35`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
+MVP, versión `0.1.36`. No incluye tokens ni claves. La configuración no secreta se guarda en `chrome.storage.local`; los tokens viven en memoria de sesión o en una caja cifrada opcional.
 
 Repositorio público con configuración genérica: cada usuario introduce su URL de GitLab/OpenProject y sus tokens en ajustes. No hay URLs internas ni credenciales en el código.
 
@@ -85,6 +85,8 @@ Valores por defecto:
 - **API key**: vacía; hay que introducir la de la cuenta.
 
 Si se deja sin API key, la extensión usa el resumen local determinista y no envía datos a ningún LLM.
+
+Si el proveedor falla, se muestra el código HTTP traducido (por ejemplo `El LLM devolvió HTTP 402 (sin crédito o con la facturación/cuota agotada en el proveedor)`), se conserva el resumen local y la petición no se reintenta en automático.
 
 La API del LLM es stateless: no puede leer conversaciones existentes de la interfaz web del proveedor. Para imitar un estilo, hay que añadir ejemplos en el prompt. La extensión todavía no tiene campo de ejemplos.
 

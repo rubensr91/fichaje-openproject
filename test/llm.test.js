@@ -139,3 +139,55 @@ test("redacta secretos antes de enviarlos al LLM", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+test("explica un 402 como problema de crédito o facturación", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response("", { status: 402, statusText: "Payment Required" });
+
+  try {
+    const result = await summarize(
+      {
+        llmBaseUrl: "https://llm.example.test/v1",
+        llmModel: "modelo-de-prueba",
+        llmApiKey: "test-key",
+        llmFilterMode: "redact"
+      },
+      { date: "2026-10-26", projectName: "demo/project", evidence }
+    );
+
+    assert.equal(result.source, "local");
+    assert.match(result.warning, /HTTP 402/);
+    assert.match(result.warning, /crédito|facturación/);
+    assert.ok(!result.warning.includes("402: 402"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("muestra el detalle del proveedor cuando no es un código conocido", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: { message: "modelo desconocido" } }), {
+      status: 404,
+      statusText: "Not Found",
+      headers: { "Content-Type": "application/json" }
+    });
+
+  try {
+    const result = await summarize(
+      {
+        llmBaseUrl: "https://llm.example.test/v1",
+        llmModel: "modelo-de-prueba",
+        llmApiKey: "test-key",
+        llmFilterMode: "redact"
+      },
+      { date: "2026-10-26", projectName: "demo/project", evidence }
+    );
+
+    assert.equal(result.source, "local");
+    assert.match(result.warning, /HTTP 404/);
+    assert.match(result.warning, /URL base|modelo/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

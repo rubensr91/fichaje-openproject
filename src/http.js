@@ -50,8 +50,8 @@ export async function requestJson(url, options = {}) {
     }
 
     if (!response.ok) {
-      const message = extractError(payload, `${response.status} ${response.statusText}`);
-      throw new Error(`${response.status}: ${message}`);
+      const detail = extractError(payload, response.statusText || "");
+      throw new Error(detail ? `${response.status}: ${detail}` : `${response.status}`);
     }
 
     return payload;

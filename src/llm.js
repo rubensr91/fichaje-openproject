@@ -7,6 +7,32 @@ import {
 } from "./summary.js";
 import { formatFindings, redactText } from "./redact.js";
 
+const HTTP_HINTS = {
+  401: "API key inválida, caducada o sin permisos",
+  402: "sin crédito o con la facturación/cuota agotada en el proveedor",
+  403: "acceso denegado con esa API key",
+  404: "endpoint o modelo inexistente (revisa la URL base y el nombre del modelo)",
+  429: "límite de peticiones alcanzado; espera y reintenta",
+  500: "error interno del proveedor",
+  502: "el proveedor no respondió correctamente (502)",
+  503: "proveedor saturado o indisponible (503)",
+  504: "el proveedor agotó el tiempo de respuesta (504)"
+};
+
+function explainLlmError(message) {
+  const text = String(message || "");
+  const statusMatch = /^(\d{3})/.exec(text);
+  if (!statusMatch) {
+    return `El LLM no respondió (${text}). Se usó el resumen local.`;
+  }
+  const status = statusMatch[1];
+  const detail = text.slice(status.length + 2).trim();
+  const hint = HTTP_HINTS[status];
+  const reason = hint || detail || "fallo del proveedor";
+  const extra = hint && detail ? ` — ${detail}` : "";
+  return `El LLM devolvió HTTP ${status} (${reason}${extra}). Se usó el resumen local.`;
+}
+
 function findingSummary(findings) {
   const types = formatFindings(findings);
   const total = findings.reduce((sum, finding) => sum + finding.count, 0);
@@ -70,7 +96,7 @@ export async function summarize(config, { date, projectName, evidence }) {
     return {
       text: local,
       source: "local",
-      warning: `El LLM no respondió (${error.message}). Se usó el resumen local.`
+      warning: explainLlmError(error?.message)
     };
   }
 }

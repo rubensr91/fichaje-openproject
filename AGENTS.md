@@ -174,7 +174,7 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **61/61 tests pasan**.
+Estado verificado: **63/63 tests pasan**.
 
 ## Estado actual y deuda técnica
 
