@@ -1,5 +1,11 @@
 import { getRuntimeConfig } from "./src/secrets.js";
-import { fetchDay, fetchRange, testGitLab } from "./src/gitlab.js";
+import {
+  fetchDay,
+  fetchDayAll,
+  fetchRange,
+  fetchRangeAll,
+  testGitLab
+} from "./src/gitlab.js";
 import {
   createTimeEntry,
   detectActivity,
@@ -86,11 +92,16 @@ async function handle(message) {
     }
 
     case "FETCH_DAY": {
-      const data = await fetchDay(config, message.date);
-      return data;
+      if ((config.gitlabMode || "project") === "all") {
+        return fetchDayAll(config, message.date);
+      }
+      return fetchDay(config, message.date);
     }
 
     case "FETCH_RANGE": {
+      if ((config.gitlabMode || "project") === "all") {
+        return fetchRangeAll(config, message.dates);
+      }
       return fetchRange(config, message.dates);
     }
 

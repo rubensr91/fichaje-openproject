@@ -271,6 +271,7 @@ function resetResult() {
 
 function populateSettings(config) {
   $("gitlabBaseUrl").value = config.gitlabBaseUrl;
+  $("gitlabMode").value = config.gitlabMode || "project";
   $("gitlabProject").value = config.gitlabProject;
   $("gitlabAuthor").value = config.gitlabAuthor;
 
@@ -363,6 +364,7 @@ function readSettings() {
     gitlabBaseUrl: $("gitlabBaseUrl").value.trim(),
     gitlabProject: $("gitlabProject").value.trim(),
     gitlabAuthor: $("gitlabAuthor").value.trim(),
+    gitlabMode: $("gitlabMode").value || "project",
     openprojectBaseUrl: $("openprojectBaseUrl").value.trim(),
     openprojectProjectId: $("openprojectProjectId").value.trim(),
     openprojectWorkPackageId: $("openprojectWorkPackageId").value.trim(),

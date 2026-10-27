@@ -76,7 +76,9 @@ background.js
 - `GET /api/v4/user`
 - `GET /api/v4/projects/:id`
 - commits, MRs e issues del proyecto para el día (`fetchDay`) o para un rango (`fetchRange`, usuario y proyecto una sola vez).
+- Modo «Todas las contribuciones» (`gitlabMode: "all"`): `GET /api/v4/events` con ventana amplia (día-1 a día+2) y filtro local por rango UTC del día; agrega actividad de todos los proyectos (`fetchDayAll`/`fetchRangeAll`). Push = solo último commit; MRs/issues sin descripción.
 - Token con `read_api` o `api`. `read_user` solo no sirve.
+- `isConfigured` solo exige `gitlabProject` en modo `project`.
 
 ### Modo semanal
 
@@ -166,11 +168,11 @@ No cambiar el modo por defecto sin probar contra una instancia real. El modo `li
   - cliente LLM.
 - No usar tokens reales en tests.
 
-Estado verificado: **32/32 tests pasan**.
+Estado verificado: **34/34 tests pasan**.
 
 ## Estado actual y deuda técnica
 
-- Una sola cuenta/proyecto GitLab.
+- Un solo proyecto GitLab por configuración; el modo «Todas las contribuciones» agrega eventos de todos los proyectos sin detalle completo.
 - Varios proyectos OpenProject, uno por fichaje.
 - En modo semanal, un único tramo horario compartido por todos los días.
 - Actividad fija `Development`.

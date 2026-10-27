@@ -159,7 +159,14 @@
             <input id="gitlabBaseUrl" type="url" placeholder="https://gitlab.example.com" />
           </label>
           <label class="field">
-            <span>Proyecto</span>
+            <span>Origen de actividad</span>
+            <select id="gitlabMode">
+              <option value="project">Proyecto concreto</option>
+              <option value="all">Todas las contribuciones (mi actividad)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Proyecto <em>(obligatorio solo en modo proyecto)</em></span>
             <input id="gitlabProject" type="text" placeholder="grupo/proyecto" />
           </label>
           <label class="field">
